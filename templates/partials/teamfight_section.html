@@ -1,0 +1,33 @@
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-label">KDA</div>
+        <div class="stat-value">{{ player.teamfight.kills }}/{{ player.teamfight.deaths }}/{{ player.teamfight.assists }}</div>
+        <div class="stat-sub">评分 {{ player.teamfight.kda }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">英雄伤害</div>
+        <div class="stat-value dmg">{{ "{:,}".format(player.teamfight.hero_damage) }}</div>
+        {% if player.teamfight.hero_damage_benchmark_pct is not none %}
+        <div class="stat-sub">百分位 {{ player.teamfight.hero_damage_benchmark_pct }}%</div>
+        {% endif %}
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">建筑伤害</div>
+        <div class="stat-value">{{ "{:,}".format(player.teamfight.tower_damage) }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">治疗量</div>
+        <div class="stat-value heal">{{ "{:,}".format(player.teamfight.hero_healing) }}</div>
+    </div>
+    {% if player.teamfight.participation_rate is not none %}
+    <div class="stat-card">
+        <div class="stat-label">团战参与率</div>
+        <div class="stat-value {% if player.teamfight.participation_rate >= 0.6 %}good{% elif player.teamfight.participation_rate >= 0.4 %}ok{% else %}bad{% endif %}">
+            {{ "%.0f"|format(player.teamfight.participation_rate * 100) }}%
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% if not player.teamfight.available %}
+<p class="no-data">部分团战数据需要解析录像后才能展示</p>
+{% endif %}

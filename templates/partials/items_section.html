@@ -1,0 +1,37 @@
+<div class="items-container">
+    <h3>最终装备</h3>
+    <div class="items-list">
+        {% for item in player.items.final_items %}
+        <span class="item-badge">{{ item }}</span>
+        {% endfor %}
+        {% if not player.items.final_items %}
+        <span class="no-data">无装备数据</span>
+        {% endif %}
+    </div>
+    <div class="items-upgrades">
+        <span class="upgrade {% if player.items.aghanims_scepter %}upgrade-active{% endif %}">阿哈利姆神杖</span>
+        <span class="upgrade {% if player.items.aghanims_shard %}upgrade-active{% endif %}">阿哈利姆魔晶</span>
+        <span class="upgrade {% if player.items.moonshard %}upgrade-active{% endif %}">银月之晶</span>
+    </div>
+</div>
+
+{% if player.items.has_timeline and player.items.purchase_timeline %}
+<div class="purchase-timeline">
+    <h3>购买记录</h3>
+    <div class="purchase-grid">
+        {% for entry in player.items.purchase_timeline %}
+        <div class="purchase-card" title="{{ entry.time_str }} {{ entry.item }}">
+            <img
+                class="purchase-icon"
+                src="https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react/items/{{ entry.item_key }}.png"
+                alt="{{ entry.item }}"
+                loading="lazy"
+            >
+            <span class="purchase-time">{{ entry.time_str }}</span>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% else %}
+<p class="no-data">购买记录需要解析录像后才能展示</p>
+{% endif %}

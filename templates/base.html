@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Dota 2 比赛分析{% endblock %}</title>
+    <link rel="stylesheet" href="/static/css/style.css?v=20260325b">
+</head>
+<body>
+    <header class="site-header">
+        <a href="/" class="logo">
+            <span class="logo-icon">D2</span>
+            <span>Dota 2 复盘分析</span>
+        </a>
+    </header>
+    <main class="container">
+        {% block content %}{% endblock %}
+    </main>
+    <script src="/static/js/app.js?v=20260325b"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Dota 2 比赛分析 - 首页{% endblock %}
+{% block content %}
+<div class="hero-section">
+    <h1>Dota 2 比赛复盘分析</h1>
+    <p class="subtitle">输入比赛 ID 后，系统会在后台异步分析，并在首页展示当前进度。</p>
+
+    <form method="POST" action="/analyze" class="analyze-form" id="analyze-form">
+        <div class="input-group">
+            <input
+                type="text"
+                name="match_id"
+                placeholder="输入比赛 ID，例如 1234567890"
+                class="match-input{% if error %} input-error{% endif %}"
+                autofocus
+                pattern="[0-9]+"
+                required
+            >
+            <button type="submit" class="btn-analyze" id="submit-btn">
+                <span class="btn-text">开始分析</span>
+                <span class="btn-loading hidden">已提交...</span>
+            </button>
+        </div>
+        {% if error %}
+        <p class="error-msg">{{ error }}</p>
+        {% endif %}
+    </form>
+
+    <div id="job-progress" class="job-progress hidden"></div>
+
+    <div class="how-to">
+        <p>比赛 ID 可在 Dota 2 客户端的个人资料与比赛记录中查看。</p>
+    </div>
+</div>
+
+{% if recent %}
+<div class="recent-section">
+    <h2>最近分析记录</h2>
+    <ul class="recent-list">
+        {% for item in recent %}
+        <li>
+            <a href="/match/{{ item.match_id }}" class="recent-item">
+                <span class="recent-id">#{{ item.match_id }}</span>
+                <span class="recent-duration">{{ item.duration_minutes }} 分钟</span>
+                <span class="recent-result {% if item.radiant_win %}radiant-win{% else %}dire-win{% endif %}">
+                    {% if item.radiant_win %}天辉胜{% else %}夜魇胜{% endif %}
+                </span>
+                <span class="recent-time">{{ item.analyzed_at }}</span>
+            </a>
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+{% endblock %}

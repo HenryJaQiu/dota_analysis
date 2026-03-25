@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}比赛 #{{ analysis.match_id }} 分析{% endblock %}
+{% block content %}
+<div class="page-actions">
+    <a href="/" class="btn-back-home">返回首页</a>
+</div>
+<div class="match-header">
+    <div class="match-info">
+        <h1>比赛 #{{ analysis.match_id }}</h1>
+        <div class="match-meta">
+            <span class="duration">{{ "%.1f"|format(analysis.duration_minutes) }} 分钟</span>
+            <span class="result {% if analysis.radiant_win %}radiant-win{% else %}dire-win{% endif %}">
+                {% if analysis.radiant_win %}天辉胜利{% else %}夜魇胜利{% endif %}
+            </span>
+            <span class="parse-badge {% if analysis.parse_status.value == 'parsed' %}badge-full{% else %}badge-partial{% endif %}">
+                {% if analysis.parse_status.value == 'parsed' %}完整数据{% else %}基础数据{% endif %}
+            </span>
+            {% if from_cache %}<span class="cache-badge">来自缓存</span>{% endif %}
+        </div>
+    </div>
+    {% if analysis.parse_status.value != 'parsed' %}
+    <div class="parse-warning">
+        当前比赛录像尚未完成解析，视野、对线等高级数据可能暂时不可用。
+        {% if parse_refreshing %}
+        系统已在后台重新检查解析状态，刷新页面后如果录像完成解析会自动升级为完整数据。
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
+<div class="teams-container">
+    <div class="team-tabs">
+        <div class="team-label radiant-label">天辉</div>
+        {% for player in analysis.players %}
+        {% if player.team == "天辉" %}
+        <button class="player-tab {% if loop.index0 == 0 %}active{% endif %}"
+                data-slot="{{ player.player_slot }}"
+                onclick="switchPlayer('{{ player.player_slot }}')">
+            <span class="tab-hero">{{ player.hero_name }}</span>
+            <span class="tab-name">{{ player.personaname or "匿名" }}</span>
+        </button>
+        {% endif %}
+        {% endfor %}
+        <div class="team-label dire-label">夜魇</div>
+        {% for player in analysis.players %}
+        {% if player.team == "夜魇" %}
+        <button class="player-tab"
+                data-slot="{{ player.player_slot }}"
+                onclick="switchPlayer('{{ player.player_slot }}')">
+            <span class="tab-hero">{{ player.hero_name }}</span>
+            <span class="tab-name">{{ player.personaname or "匿名" }}</span>
+        </button>
+        {% endif %}
+        {% endfor %}
+    </div>
+
+    {% for player in analysis.players %}
+    <div class="player-panel {% if loop.index0 == 0 %}active{% endif %}"
+         id="panel-{{ player.player_slot }}">
+        <div class="player-header">
+            <div class="player-title">
+                <h2>{{ player.hero_name }}</h2>
+                <span class="player-name">{{ player.personaname or "匿名" }}</span>
+                <span class="player-rank">{{ player.rank_name }}</span>
+                <span class="player-team-badge {% if player.team == '天辉' %}radiant-badge{% else %}dire-badge{% endif %}">
+                    {{ player.team }}
+                </span>
+            </div>
+        </div>
+
+        <div class="section-tabs">
+            <button class="section-tab active" onclick="switchSection(this, 'economy-{{ player.player_slot }}')">经济</button>
+            <button class="section-tab" onclick="switchSection(this, 'teamfight-{{ player.player_slot }}')">团战</button>
+            <button class="section-tab" onclick="switchSection(this, 'items-{{ player.player_slot }}')">出装</button>
+            <button class="section-tab" onclick="switchSection(this, 'vision-{{ player.player_slot }}')">视野</button>
+            <button class="section-tab" onclick="switchSection(this, 'objectives-{{ player.player_slot }}')">目标</button>
+            <button class="section-tab" onclick="switchSection(this, 'laning-{{ player.player_slot }}')">对线</button>
+        </div>
+
+        <div class="section-content active" id="economy-{{ player.player_slot }}">
+            {% include "partials/economy_section.html" %}
+        </div>
+        <div class="section-content" id="teamfight-{{ player.player_slot }}">
+            {% include "partials/teamfight_section.html" %}
+        </div>
+        <div class="section-content" id="items-{{ player.player_slot }}">
+            {% include "partials/items_section.html" %}
+        </div>
+        <div class="section-content" id="vision-{{ player.player_slot }}">
+            {% include "partials/vision_section.html" %}
+        </div>
+        <div class="section-content" id="objectives-{{ player.player_slot }}">
+            {% include "partials/objectives_section.html" %}
+        </div>
+        <div class="section-content" id="laning-{{ player.player_slot }}">
+            {% include "partials/laning_section.html" %}
+        </div>
+
+        {% if player.ai_suggestions %}
+        {% include "partials/suggestions_box.html" %}
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+
+<script>
+window.MATCH_DATA = {{ analysis.dict() | tojson | safe }};
+</script>
+{% endblock %}
+{% block scripts %}
+<script src="/static/js/charts.js?v=20260325b"></script>
+{% endblock %}

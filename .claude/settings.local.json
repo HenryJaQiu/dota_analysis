@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip show:*)",
+      "Bash(python -c \"import fastapi; print\\(''fastapi ok''\\)\")",
+      "Bash(python -c \"import httpx; print\\(''httpx ok''\\)\")",
+      "WebFetch(domain:api.opendota.com)",
+      "WebFetch(domain:docs.opendota.com)",
+      "Bash(python -c \"import anthropic; print\\(anthropic.__version__\\)\")",
+      "Bash(pip install:*)",
+      "Bash(python -c \"import fastapi, uvicorn, httpx, jinja2, anthropic, pydantic; print\\(''All imports OK''\\)\")",
+      "Bash(python -c \"from main import app; print\\(''App loaded OK''\\)\")",
+      "Bash(python -c \"from main import app; print\\(''OK''\\)\")",
+      "Bash(python -c \":*)"
+    ]
+  }
+}

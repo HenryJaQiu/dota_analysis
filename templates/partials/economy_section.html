@@ -1,0 +1,45 @@
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-label">GPM</div>
+        <div class="stat-value gold">{{ player.economy.gpm }}</div>
+        {% if player.economy.gpm_benchmark_pct is not none %}
+        <div class="stat-sub">百分位 {{ player.economy.gpm_benchmark_pct }}%</div>
+        {% endif %}
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">XPM</div>
+        <div class="stat-value xp">{{ player.economy.xpm }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">补刀 / 反补</div>
+        <div class="stat-value">{{ player.economy.last_hits }} / {{ player.economy.denies }}</div>
+        {% if player.economy.lh_benchmark_pct is not none %}
+        <div class="stat-sub">补刀百分位 {{ player.economy.lh_benchmark_pct }}%</div>
+        {% endif %}
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">净资产</div>
+        <div class="stat-value gold">{{ "{:,}".format(player.economy.net_worth) }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">总花费</div>
+        <div class="stat-value">{{ "{:,}".format(player.economy.gold_spent) }}</div>
+    </div>
+</div>
+{% if player.economy.gold_timeline %}
+<div class="chart-container">
+    <div class="chart-head">
+        <h3>经济时间图</h3>
+        <div class="chart-mode-switch">
+            <button type="button" class="chart-mode-btn active" data-slot="{{ player.player_slot }}" data-mode="all">所有人</button>
+            <button type="button" class="chart-mode-btn" data-slot="{{ player.player_slot }}" data-mode="teams">阵营对比</button>
+            <button type="button" class="chart-mode-btn" data-slot="{{ player.player_slot }}" data-mode="solo">仅当前玩家</button>
+        </div>
+    </div>
+    <div id="gold-chart-{{ player.player_slot }}" class="gold-chart"></div>
+    <div id="gold-chart-tooltip-{{ player.player_slot }}" class="chart-tooltip hidden"></div>
+    <div id="gold-chart-legend-{{ player.player_slot }}" class="chart-legend"></div>
+</div>
+{% else %}
+<p class="no-data">经济时间图需要解析录像后才能展示</p>
+{% endif %}

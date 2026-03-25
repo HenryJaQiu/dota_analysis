@@ -1,0 +1,35 @@
+{% if player.laning.available %}
+<div class="stats-grid">
+    {% if player.laning.lane_name %}
+    <div class="stat-card">
+        <div class="stat-label">对线位置</div>
+        <div class="stat-value">{{ player.laning.lane_name }}</div>
+        {% if player.laning.is_roaming %}
+        <div class="stat-sub">游走模式</div>
+        {% endif %}
+    </div>
+    {% endif %}
+    {% if player.laning.camps_stacked is not none %}
+    <div class="stat-card">
+        <div class="stat-label">叠营数</div>
+        <div class="stat-value">{{ player.laning.camps_stacked }}</div>
+    </div>
+    {% endif %}
+    {% if player.laning.creeps_stacked is not none %}
+    <div class="stat-card">
+        <div class="stat-label">引入叠营野怪</div>
+        <div class="stat-value">{{ player.laning.creeps_stacked }}</div>
+    </div>
+    {% endif %}
+    {% if player.laning.actions_per_min is not none %}
+    <div class="stat-card">
+        <div class="stat-label">每分钟操作数(APM)</div>
+        <div class="stat-value">{{ player.laning.actions_per_min }}</div>
+    </div>
+    {% endif %}
+</div>
+{% else %}
+<div class="no-data-section">
+    <p class="no-data">对线数据需解析录像后可用</p>
+</div>
+{% endif %}

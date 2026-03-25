@@ -1,0 +1,47 @@
+<div class="suggestions-box">
+    <h3 class="suggestions-title">AI 教练建议</h3>
+
+    {% if player.ai_suggestions.priority_improvement %}
+    <div class="priority-suggestion">
+        <div class="priority-label">首要改进</div>
+        <div class="priority-text">{{ player.ai_suggestions.priority_improvement }}</div>
+    </div>
+    {% endif %}
+
+    {% if player.ai_suggestions.overall_summary %}
+    <div class="summary-text">{{ player.ai_suggestions.overall_summary }}</div>
+    {% endif %}
+
+    <div class="tips-grid">
+        {% if player.ai_suggestions.economy_tips %}
+        <div class="tips-group">
+            <h4>经济建议</h4>
+            <ul>{% for tip in player.ai_suggestions.economy_tips %}<li>{{ tip }}</li>{% endfor %}</ul>
+        </div>
+        {% endif %}
+        {% if player.ai_suggestions.teamfight_tips %}
+        <div class="tips-group">
+            <h4>团战建议</h4>
+            <ul>{% for tip in player.ai_suggestions.teamfight_tips %}<li>{{ tip }}</li>{% endfor %}</ul>
+        </div>
+        {% endif %}
+        {% if player.ai_suggestions.item_tips %}
+        <div class="tips-group">
+            <h4>出装建议</h4>
+            <ul>{% for tip in player.ai_suggestions.item_tips %}<li>{{ tip }}</li>{% endfor %}</ul>
+        </div>
+        {% endif %}
+        {% if player.ai_suggestions.vision_tips %}
+        <div class="tips-group">
+            <h4>视野建议</h4>
+            <ul>{% for tip in player.ai_suggestions.vision_tips %}<li>{{ tip }}</li>{% endfor %}</ul>
+        </div>
+        {% endif %}
+        {% if player.ai_suggestions.laning_tips %}
+        <div class="tips-group">
+            <h4>对线建议</h4>
+            <ul>{% for tip in player.ai_suggestions.laning_tips %}<li>{{ tip }}</li>{% endfor %}</ul>
+        </div>
+        {% endif %}
+    </div>
+</div>

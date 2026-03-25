@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}错误 - Dota 2 比赛分析{% endblock %}
+{% block content %}
+<div class="error-page">
+    <div class="error-code">{{ error_code }}</div>
+    <div class="error-message">{{ message }}</div>
+    {% if suggestion %}
+    <div class="error-suggestion">{{ suggestion }}</div>
+    {% endif %}
+    <a href="/" class="btn-back">返回首页</a>
+</div>
+{% endblock %}

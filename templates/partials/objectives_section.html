@@ -1,0 +1,24 @@
+{% if player.objectives.available %}
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-label">参与击杀肉山</div>
+        <div class="stat-value">{{ player.objectives.roshan_kills }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">参与击杀痛苦魔方</div>
+        <div class="stat-value">{{ player.objectives.tormentor_kills }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">拾取智慧神符</div>
+        <div class="stat-value">{{ player.objectives.wisdom_runes }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">莲花池使用</div>
+        <div class="stat-value">{{ player.objectives.lotus_pool_uses }}</div>
+    </div>
+</div>
+{% else %}
+<div class="no-data-section">
+    <p class="no-data">目标控制数据需解析录像后可用</p>
+</div>
+{% endif %}

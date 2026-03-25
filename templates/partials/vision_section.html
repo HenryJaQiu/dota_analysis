@@ -1,0 +1,25 @@
+{% if player.vision.available %}
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-label">侦查守卫放置</div>
+        <div class="stat-value">{{ player.vision.obs_placed or 0 }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">岗哨守卫放置</div>
+        <div class="stat-value">{{ player.vision.sen_placed or 0 }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">排掉敌方侦查</div>
+        <div class="stat-value">{{ player.vision.obs_killed or 0 }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">排掉敌方岗哨</div>
+        <div class="stat-value">{{ player.vision.sen_killed or 0 }}</div>
+    </div>
+</div>
+{% else %}
+<div class="no-data-section">
+    <p class="no-data">视野数据需要解析录像后才能展示</p>
+    <p class="no-data-hint">OpenDota 解析录像通常需要几分钟，稍后刷新页面即可。</p>
+</div>
+{% endif %}
