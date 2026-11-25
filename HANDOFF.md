@@ -1,5 +1,7 @@
 # Dota 项目交接文档
 
+> **历史文档提示**：本文记录的是原版 MiniMax 单模型实现，部分文件与流程已经过时。当前版本请以 [README.md](README.md) 为准。AI 相关实现已迁移到 `app/services/ai_analyzer.py`、`app/services/llm_client.py`、`app/services/llm_settings.py`，并支持多模型 GUI。
+
 ## 1. 项目定位
 
 这是一个基于 FastAPI 的 Dota 2 比赛复盘 Web 应用。

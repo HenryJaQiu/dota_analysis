@@ -11,6 +11,16 @@
 - **协议自适应**：OpenAI 兼容（`/chat/completions`）与 Anthropic 兼容（`/messages`）双协议
 - **配置持久化**：保存在本机 `cache/llm_settings.json`，不会提交到 Git
 
+## 界面预览
+
+### 首页
+
+![首页](docs/screenshots/home.png)
+
+### 模型设置
+
+![模型设置](docs/screenshots/settings.png)
+
 ## 功能特性
 
 - 比赛 ID 输入，后台异步分析并实时展示进度
@@ -44,7 +54,11 @@
 4. 启动服务
 5. 自动打开浏览器 `http://127.0.0.1:8000/`
 
-之后再次双击会跳过安装，直接启动。服务运行在黑色命令行窗口中，按 `Ctrl+C` 或关闭窗口即可停止。
+之后再次双击会跳过安装，直接启动。服务运行在黑色命令行窗口中：
+
+- **输入 `Q` 后按回车退出服务**
+- 也可以按 `Ctrl+C`，或直接关闭命令行窗口
+- 退出时浏览器页面会失效，这是正常现象
 
 > 如果电脑没有 Python，请先从 [python.org](https://www.python.org/downloads/) 安装 Python 3.10+，安装时勾选 “Add python.exe to PATH”。
 
@@ -77,7 +91,7 @@ python main.py
 5. 点击「测试连接」确认可用，再点「保存设置」
 6. 回到首页输入比赛 ID 开始分析
 
-配置会写入 `cache/llm_settings.json`，下次启动自动读取。
+配置会写入 `cache/llm_settings.json`，下次启动自动读取。该文件已被 `.gitignore` 忽略，不会上传到 GitHub。
 
 ## 支持的模型来源
 
@@ -98,6 +112,8 @@ OpenCode Go 同时提供两种协议：
 - MiniMax M3、Qwen、Claude：使用 `/v1/messages`
 
 程序默认使用「自动识别」：根据模型名前缀和 Base URL 选择协议。也可以在下拉框中强制指定协议。调用 OpenCode Go 时会自动附带它要求的 `x-opencode-session` 请求头。
+
+> 对 OpenCode Go，「拉取列表」读取的是公开模型目录，因此会显示完整目录（当前 31 个对话模型）。你的订阅或工作区隐私设置可能只启用其中一部分，选完后点「测试连接」即可确认；如果返回 403，请到 OpenCode 控制台调整 Regions / Privacy 设置或升级套餐。
 
 ## 配置项
 
@@ -136,9 +152,56 @@ MINIMAX_MODEL=MiniMax-M2.7
 
 > 网页保存过设置后，`cache/llm_settings.json` 优先于 `.env`。
 
-## 安全说明
+## 本地配置与密钥安全
 
-- API Key 以明文写入本机 `cache/llm_settings.json`（`cache/` 已在 `.gitignore` 中）。
+### 配置保存在哪里
+
+| 内容 | 路径 | 是否提交 Git |
+| --- | --- | --- |
+| 模型来源、Base URL、API Key、模型、参数 | `cache/llm_settings.json` | 否 |
+| 可选的环境变量默认值 | `.env` | 否 |
+| 比赛分析缓存 | `cache/matches/*.json` | 否 |
+| 环境变量模板 | `.env.example` | 是（仅占位符） |
+
+API Key 只会写入本机 `cache/llm_settings.json`。`.gitignore` 已显式忽略：
+
+```gitignore
+.env
+.env.*
+!.env.example
+cache/
+llm_settings.json
+**/llm_settings.json
+.claude/settings.local.json
+```
+
+### 上传 GitHub 前自查
+
+```bash
+git status --short
+git check-ignore -v cache/llm_settings.json .env
+git ls-files | grep -E "(^|/)\.env$|llm_settings\.json|^cache/"
+```
+
+Windows PowerShell 版本：
+
+```powershell
+git status --short
+git check-ignore -v cache/llm_settings.json .env
+git ls-files | Select-String -Pattern "llm_settings.json|^cache/|(^|/)\.env$"
+```
+
+预期结果：
+
+- `git status` 不出现 `cache/`、`.env`、`llm_settings.json`
+- `git check-ignore` 能输出对应的忽略规则
+- `git ls-files` 只可能列出 `.env.example`，不会列出真实配置文件
+
+> 如果不小心提交过 Key：先去模型平台撤销并重新生成 Key，再用 `git filter-repo` 或 BFG 清理历史。只删除当前文件不够，旧提交里仍然能读到 Key。
+
+### 其他安全建议
+
+- API Key 在本地配置文件中是明文，请注意电脑和账户安全。
 - 服务默认只监听 `127.0.0.1`，不要在没有额外鉴权的情况下暴露到公网。
 - `/api/llm/models` 只会在请求的 Base URL 与已保存地址同源时复用已保存的 Key，避免把 Key 发送到任意第三方域名。
 - 网页只会收到打码后的 Key（如 `sk-a…cdef`），不会回显完整 Key。
@@ -171,11 +234,13 @@ MINIMAX_MODEL=MiniMax-M2.7
 ```
 ├── start.bat                     # 一键启动（英文文件名）
 ├── 启动.bat                      # 一键启动（中文文件名）
-├── scripts/launcher.py           # 启动器：读取端口、等待服务、打开浏览器
+├── scripts/launcher.py           # 启动器：等待服务、打开浏览器、Q 退出
 ├── main.py                       # FastAPI 入口
 ├── requirements.txt
 ├── requirements-dev.txt
-├── .env.example
+├── .env.example                  # 仅占位符，可安全提交
+├── .gitignore                    # 忽略 .env / cache / 本地模型配置
+├── .gitattributes
 │
 ├── app/
 │   ├── config.py                 # 环境变量与默认配置
@@ -197,7 +262,8 @@ MINIMAX_MODEL=MiniMax-M2.7
 │
 ├── templates/                    # 页面与模型设置弹窗
 ├── static/js/settings.js         # 模型设置 GUI
-└── tests/                        # 解析与配置单元测试
+├── tests/                        # 解析与配置单元测试
+└── docs/screenshots/             # README 截图
 ```
 
 ## 测试
@@ -231,12 +297,56 @@ pytest -q
 
 ## 发布到自己的 GitHub
 
-当前目录保留着原仓库的 Git 历史，并已创建分支 `feature/multi-provider-gui`。在 GitHub 上 fork 原仓库后：
+当前目录保留着原仓库的 Git 历史，并已创建分支 `feature/multi-provider-gui`。
+
+### 1. 在 GitHub 创建空仓库
+
+- 仓库名建议：`dota-analysis` 或 `dota2-review-assistant`
+- **不要**勾选自动生成 README / .gitignore / LICENSE
+- 简介建议：`Dota 2 match review assistant with OpenDota data and a multi-provider LLM GUI.`
+- Topics 建议：`dota2`, `fastapi`, `opendata`, `llm`, `opencode`, `ai-coach`
+
+### 2. 推送前检查
 
 ```bash
-git remote add mine https://github.com/<你的用户名>/dota_analysis.git
-git push -u mine feature/multi-provider-gui
+git status --short
+git check-ignore -v cache/llm_settings.json .env
+git ls-files | grep -E "(^|/)\.env$|llm_settings\.json|^cache/"
+pytest -q
 ```
+
+确认没有密钥和本地缓存后，再执行推送。
+
+### 3. 添加远程并推送
+
+```bash
+git remote add origin https://github.com/<你的用户名>/<仓库名>.git
+git push -u origin feature/multi-provider-gui
+```
+
+如果希望 `main` 作为默认分支：
+
+```bash
+git checkout -b main
+git push -u origin main
+```
+
+### 4. 仓库设置建议
+
+- 不要用「上传文件夹」的方式打包整个目录，避免把 `.venv/`、`cache/`、`.env` 一起传上去
+- 使用 `git push` 推送，`.gitignore` 会自动排除本地文件
+- 建议在仓库 About 中填写简介和 Topics
+- 如果原项目没有 LICENSE 文件，公开发布前请确认原作者授权
+
+### 5. 发布前检查清单
+
+- [ ] `git status` 中没有 `cache/`、`.env`、`llm_settings.json`
+- [ ] `git ls-files` 中没有真实 API Key
+- [ ] `.env.example` 中只有占位符
+- [ ] `pytest -q` 全部通过
+- [ ] 双击 `启动.bat` 能正常启动
+- [ ] 首次打开页面能配置模型并完成一次比赛分析
+- [ ] README 中的仓库地址、分支名和截图与实际一致
 
 ## 注意事项
 
@@ -244,3 +354,7 @@ git push -u mine feature/multi-provider-gui
 - OpenDota 对未解析录像需要等待，系统会自动轮询
 - 进程内任务管理适合单机使用；多实例部署需要换成 Redis / 队列
 - 模型返回非 JSON 内容时，会降级为原始文本展示并在页面提示
+
+## 项目来源与授权
+
+本项目基于 [853qy/dota_analysis](https://github.com/853qy/dota_analysis) 修改，保留了原仓库的 Git 历史与致谢。原仓库未附带单独的 LICENSE 文件；如果要公开分发或商用，请先确认原作者的授权，并保留本节的来源说明。

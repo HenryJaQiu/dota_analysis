@@ -53,7 +53,7 @@ if errorlevel 1 (
 
 echo [INFO] Starting the server...
 echo [INFO] The browser will open automatically when it is ready.
-echo [INFO] Keep this window open. Press Ctrl+C to stop the server.
+echo [INFO] Keep this window open. Type Q + Enter to stop the server.
 echo.
 
 "%VENV_PY%" "%ROOT%scripts\launcher.py"

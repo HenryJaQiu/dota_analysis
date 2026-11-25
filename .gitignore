@@ -1,3 +1,4 @@
+# ===== Python =====
 __pycache__/
 *.py[cod]
 *$py.class
@@ -5,24 +6,43 @@ __pycache__/
 .venv/
 venv/
 env/
-
-.env
-.env.local
-.env.*.local
-
-cache/
-.cache/
-
-*.log
 *.egg-info/
 dist/
 build/
 .eggs/
 
-.DS_Store
-.vscode/
-.idea/
+# ===== Local secrets (never commit) =====
+# .env may contain API keys. Only .env.example is tracked.
+.env
+.env.*
+!.env.example
 
+# The web UI saves the selected provider, API key and model here.
+# cache/ also stores match data. Both must stay local.
+cache/
+.cache/
+llm_settings.json
+**/llm_settings.json
+
+# Certificates / private keys, if you add them later.
+*.key
+*.pem
+*.p12
+secrets/
+
+# Claude Code local permissions.
+.claude/settings.local.json
+
+# ===== Logs / test artifacts =====
+*.log
 .pytest_cache/
 .coverage
 htmlcov/
+test-results/
+playwright-report/
+/screenshots/
+
+# ===== Editors / OS =====
+.DS_Store
+.vscode/
+.idea/

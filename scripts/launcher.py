@@ -1,6 +1,7 @@
 """Launcher used by start.bat.
 
-Keeps all port / host / browser logic in Python so the batch file stays small.
+Starts uvicorn in a worker thread, opens the browser, and keeps the console
+available for an explicit Q + Enter exit command.
 """
 
 import os
@@ -28,16 +29,30 @@ def probe(base_url: str, timeout: float = 1.0) -> bool:
         return False
 
 
-def open_browser_when_ready(base_url: str) -> None:
-    if os.environ.get("NO_BROWSER") == "1":
-        return
-    for _ in range(120):
-        if probe(base_url):
-            webbrowser.open(base_url + "/")
+def wait_for_start(server, thread: threading.Thread, timeout: float = 30.0) -> bool:
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if server.started:
+            return True
+        if not thread.is_alive():
+            return False
+        time.sleep(0.1)
+    return bool(server.started)
+
+
+def wait_for_quit() -> None:
+    print()
+    print("=" * 58)
+    print("  输入 Q 后按回车退出服务  |  Type Q + Enter to stop")
+    print("  Ctrl+C 也可以退出          |  Ctrl+C also works")
+    print("=" * 58)
+    while True:
+        try:
+            command = input("> ").strip().lower()
+        except (EOFError, KeyboardInterrupt):
             return
-        time.sleep(0.5)
-    print(f"[WARN] Server did not become ready at {base_url}.")
-    print("[WARN] Open that address manually in your browser.")
+        if command in {"q", "quit", "exit", "0", "退出"}:
+            return
 
 
 def main() -> int:
@@ -57,17 +72,44 @@ def main() -> int:
     print("[INFO] First load may take a few seconds.")
     print()
 
-    threading.Thread(
-        target=open_browser_when_ready, args=(base_url,), daemon=True
-    ).start()
-
     import uvicorn
 
-    try:
-        uvicorn.run("main:app", host=host, port=settings.app_port)
-    except KeyboardInterrupt:
-        print()
-        print("[INFO] Server stopped.")
+    config = uvicorn.Config(
+        "main:app",
+        host=host,
+        port=settings.app_port,
+        log_level="info",
+    )
+    server = uvicorn.Server(config)
+    server_thread = threading.Thread(target=server.run, name="uvicorn", daemon=True)
+    server_thread.start()
+
+    if not wait_for_start(server, server_thread):
+        print("[ERROR] Server failed to start. Is the port already in use?")
+        server.should_exit = True
+        server_thread.join(timeout=3)
+        return 1
+
+    print(f"[INFO] Server ready: {base_url}")
+    if os.environ.get("NO_BROWSER") != "1":
+        webbrowser.open(base_url + "/")
+
+    if os.environ.get("NO_EXIT_PROMPT") == "1":
+        try:
+            server_thread.join()
+        except KeyboardInterrupt:
+            pass
+    else:
+        wait_for_quit()
+
+    print()
+    print("[INFO] Shutting down, please wait...")
+    server.should_exit = True
+    server_thread.join(timeout=15)
+    if server_thread.is_alive():
+        server.force_exit = True
+        server_thread.join(timeout=5)
+    print("[INFO] Server stopped.")
     return 0
 
 

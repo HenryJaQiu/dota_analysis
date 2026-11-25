@@ -347,12 +347,24 @@ async def list_models(
 
     protocol = resolve_protocol(config)
     url = _models_endpoint(config, protocol)
+    is_opencode = "opencode.ai" in config.base_url.lower()
+
     headers = _auth_headers(config, protocol)
     headers.pop("Content-Type", None)
+    if is_opencode:
+        # The OpenCode Go /models endpoint is public and returns the full
+        # catalog. Sending the key makes the server return only the subset
+        # enabled for that workspace, which looks like a truncated list.
+        headers.pop("Authorization", None)
+        headers.pop("x-api-key", None)
 
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(timeout, connect=10.0)) as client:
             resp = await client.get(url, headers=headers)
+            if is_opencode and resp.status_code in (401, 403) and config.api_key:
+                auth_headers = _auth_headers(config, protocol)
+                auth_headers.pop("Content-Type", None)
+                resp = await client.get(url, headers=auth_headers)
     except httpx.TimeoutException as exc:
         raise LLMError("获取模型列表超时，请手动输入模型 ID") from exc
     except httpx.HTTPError as exc:

@@ -436,7 +436,11 @@
                 const skipped = result.skipped
                     ? `，已过滤 ${result.skipped} 个 embedding/decision 模型`
                     : "";
-                hint.textContent = `已获取 ${count} 个对话模型（OpenAI 兼容 ${openaiCount} 个，Anthropic 兼容 ${anthropicCount} 个；${source}${skipped}）。从上方下拉框选择，或手动输入模型 ID。`;
+                const isOpenCode = $("llm-provider").value === "opencode-go";
+                const caveat = isOpenCode
+                    ? "；列表来自公开目录，实际可用性取决于你的订阅与隐私设置，建议点「测试连接」验证"
+                    : "";
+                hint.textContent = `已获取 ${count} 个对话模型（OpenAI 兼容 ${openaiCount} 个，Anthropic 兼容 ${anthropicCount} 个；${source}${skipped}${caveat}）。从上方下拉框选择，或手动输入模型 ID。`;
                 hint.classList.toggle("is-warning", result.source !== "remote");
             }
             if (result.warning) {
