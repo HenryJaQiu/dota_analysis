@@ -3,7 +3,23 @@
 {% block content %}
 <div class="page-actions">
     <a href="/" class="btn-back-home">返回首页</a>
+    <div class="match-actions">
+        <span class="ai-model-badge" title="生成当前 AI 建议所用的模型">
+            AI 建议：<strong>{{ ai_model or "尚未生成" }}</strong>
+        </span>
+        <button type="button" class="btn-secondary" id="reanalyze-btn"
+                data-match-id="{{ analysis.match_id }}">
+            用当前模型重新生成建议
+        </button>
+    </div>
 </div>
+
+<div class="warning-banner js-llm-warning{% if llm and llm.configured %} hidden{% endif %}">
+    <span>尚未配置模型 API Key，当前页面只展示比赛数据。配置后可用当前模型重新生成 AI 建议。</span>
+    <button type="button" class="link-btn" data-open-settings>立即配置</button>
+</div>
+
+<div id="reanalyze-status" class="job-progress hidden"></div>
 <div class="match-header">
     <div class="match-info">
         <h1>比赛 #{{ analysis.match_id }}</h1>
@@ -104,9 +120,9 @@
 </div>
 
 <script>
-window.MATCH_DATA = {{ analysis.dict() | tojson | safe }};
+window.MATCH_DATA = {{ analysis.model_dump(mode="json") | tojson | safe }};
 </script>
 {% endblock %}
 {% block scripts %}
-<script src="/static/js/charts.js?v=20260325b"></script>
+<script src="/static/js/charts.js?v=20261125a"></script>
 {% endblock %}

@@ -4,6 +4,7 @@
 <div class="hero-section">
     <h1>Dota 2 比赛复盘分析</h1>
     <p class="subtitle">输入比赛 ID 后，系统会在后台异步分析，并在首页展示当前进度。</p>
+    <p class="subtitle-note">支持 OpenCode Go、DeepSeek、OpenAI、MiniMax、Ollama 及任意兼容接口</p>
 
     <form method="POST" action="/analyze" class="analyze-form" id="analyze-form">
         <div class="input-group">
@@ -25,6 +26,18 @@
         <p class="error-msg">{{ error }}</p>
         {% endif %}
     </form>
+
+    <div class="model-hint">
+        <span>当前 AI 模型</span>
+        <strong class="js-llm-model">{{ llm.model if llm else "加载中…" }}</strong>
+        <span class="model-hint-provider js-llm-provider">{{ llm.provider_label if llm else "" }}</span>
+        <button type="button" class="link-btn" data-open-settings>更换模型</button>
+    </div>
+
+    <div class="warning-banner js-llm-warning{% if llm and llm.configured %} hidden{% endif %}">
+        <span>尚未配置模型 API Key。比赛数据仍可正常分析，但不会生成 AI 教练建议。</span>
+        <button type="button" class="link-btn" data-open-settings>立即配置</button>
+    </div>
 
     <div id="job-progress" class="job-progress hidden"></div>
 

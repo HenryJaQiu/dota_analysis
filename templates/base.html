@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Dota 2 比赛分析{% endblock %}</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=20260325b">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230d1117'/%3E%3Ctext x='32' y='44' font-family='Segoe UI,sans-serif' font-size='30' font-weight='700' text-anchor='middle' fill='%23f6c90e'%3ED2%3C/text%3E%3C/svg%3E">
+    <link rel="stylesheet" href="/static/css/style.css?v=20261125a">
 </head>
 <body>
     <header class="site-header">
@@ -12,11 +13,118 @@
             <span class="logo-icon">D2</span>
             <span>Dota 2 复盘分析</span>
         </a>
+        <div class="header-actions">
+            <button type="button"
+                    class="model-chip{% if llm and not llm.configured %} is-warning{% endif %}"
+                    id="header-model-chip"
+                    data-open-settings
+                    title="点击配置 AI 模型">
+                {% if llm %}{{ llm.provider_label }} · {{ llm.model }}{% else %}模型：加载中…{% endif %}
+            </button>
+            <button type="button" class="btn-header" data-open-settings>
+                <span aria-hidden="true">⚙</span> 模型设置
+            </button>
+        </div>
     </header>
     <main class="container">
         {% block content %}{% endblock %}
     </main>
-    <script src="/static/js/app.js?v=20260325b"></script>
+
+    <div class="modal-backdrop" id="settings-modal" aria-hidden="true">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+            <div class="modal-header">
+                <div>
+                    <h2 id="settings-title">AI 模型设置</h2>
+                    <p class="modal-subtitle">
+                        配置任意 OpenAI / Anthropic 兼容接口。密钥只保存在本机
+                        <code>cache/llm_settings.json</code>，不会上传到其他地方。
+                    </p>
+                </div>
+                <button type="button" class="modal-close" id="settings-close" aria-label="关闭">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-grid">
+                    <div class="form-field">
+                        <label for="llm-provider">模型来源</label>
+                        <select id="llm-provider" class="form-input"></select>
+                        <p class="form-hint" id="llm-provider-hint"></p>
+                    </div>
+                    <div class="form-field">
+                        <label for="llm-protocol">接口协议</label>
+                        <select id="llm-protocol" class="form-input">
+                            <option value="auto">自动识别</option>
+                            <option value="openai">OpenAI 兼容 (/chat/completions)</option>
+                            <option value="anthropic">Anthropic 兼容 (/messages)</option>
+                        </select>
+                        <p class="form-hint">MiniMax M3、Qwen、Claude 系列会自动走 Anthropic 协议。</p>
+                    </div>
+
+                    <div class="form-field full">
+                        <label for="llm-base-url">Base URL</label>
+                        <input type="url" id="llm-base-url" class="form-input"
+                               placeholder="https://opencode.ai/zen/go/v1" spellcheck="false">
+                        <p class="form-hint">OpenAI 兼容地址通常以 <code>/v1</code> 结尾。</p>
+                    </div>
+
+                    <div class="form-field full">
+                        <label for="llm-api-key">API Key</label>
+                        <div class="key-row">
+                            <input type="password" id="llm-api-key" class="form-input"
+                                   placeholder="粘贴 API Key" autocomplete="off" spellcheck="false">
+                            <button type="button" class="btn-secondary" id="llm-toggle-key">显示</button>
+                            <button type="button" class="btn-ghost" id="llm-clear-key">清除</button>
+                        </div>
+                        <p class="form-hint" id="llm-key-hint">密钥只会保存在本机配置文件中。</p>
+                    </div>
+
+                    <div class="form-field full">
+                        <label for="llm-model">模型</label>
+                        <div class="key-row">
+                            <input type="text" id="llm-model" class="form-input"
+                                   list="llm-model-options" placeholder="deepseek-v4.1-flash"
+                                   autocomplete="off" spellcheck="false">
+                            <button type="button" class="btn-secondary" id="llm-refresh-models">拉取列表</button>
+                        </div>
+                        <datalist id="llm-model-options"></datalist>
+                        <p class="form-hint" id="llm-model-hint">可直接手动输入模型 ID，或从服务端拉取模型列表。</p>
+                    </div>
+
+                    <div class="form-field">
+                        <label for="llm-temperature">Temperature</label>
+                        <input type="number" id="llm-temperature" class="form-input"
+                               min="0" max="2" step="0.1" value="0.4">
+                    </div>
+                    <div class="form-field">
+                        <label for="llm-max-tokens">最大输出 tokens</label>
+                        <input type="number" id="llm-max-tokens" class="form-input"
+                               min="64" max="32768" step="64" value="4096">
+                    </div>
+                    <div class="form-field">
+                        <label for="llm-timeout">请求超时（秒）</label>
+                        <input type="number" id="llm-timeout" class="form-input"
+                               min="10" max="600" step="10" value="180">
+                    </div>
+                    <div class="form-field">
+                        <label for="llm-concurrency">并发数</label>
+                        <input type="number" id="llm-concurrency" class="form-input"
+                               min="1" max="10" step="1" value="3">
+                        <p class="form-hint">同时分析多少名玩家，过高可能触发限流。</p>
+                    </div>
+                </div>
+
+                <div class="settings-footer">
+                    <div class="settings-status" id="llm-settings-status" role="status"></div>
+                    <div class="settings-actions">
+                        <button type="button" class="btn-secondary" id="llm-test">测试连接</button>
+                        <button type="button" class="btn-primary" id="llm-save">保存设置</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/app.js?v=20261125a"></script>
+    <script src="/static/js/settings.js?v=20261125a"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

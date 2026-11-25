@@ -9,7 +9,7 @@ from app.config import settings
 from app.models.analysis import MatchAnalysis
 
 logger = logging.getLogger(__name__)
-CURRENT_CACHE_VERSION = 3
+CURRENT_CACHE_VERSION = 4
 
 
 class CacheManager:
@@ -37,7 +37,7 @@ class CacheManager:
                 data = json.load(f)
             if data.get("cache_version") != CURRENT_CACHE_VERSION:
                 return None
-            return MatchAnalysis(**data)
+            return MatchAnalysis.model_validate(data)
         except Exception as e:
             logger.warning(f"Cache read error for {match_id}: {e}")
             return None
@@ -45,7 +45,7 @@ class CacheManager:
     def set(self, match_id: int, analysis: MatchAnalysis) -> None:
         try:
             path = self._path(match_id)
-            data = json.loads(analysis.json())
+            data = analysis.model_dump(mode="json")
             data["cache_version"] = CURRENT_CACHE_VERSION
             fd, tmp_path = tempfile.mkstemp(dir=self.cache_dir, suffix=".tmp")
             try:

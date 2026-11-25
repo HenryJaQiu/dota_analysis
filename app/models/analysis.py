@@ -73,6 +73,11 @@ class AISuggestions(BaseModel):
     laning_tips: List[str] = []
     overall_summary: str = ""
     priority_improvement: str = ""
+    # Metadata about the model that produced this review.
+    provider: Optional[str] = None
+    model: Optional[str] = None
+    generated_at: Optional[datetime] = None
+    error: Optional[str] = None
 
 
 class PlayerAnalysis(BaseModel):
@@ -100,4 +105,4 @@ class MatchAnalysis(BaseModel):
     players: List[PlayerAnalysis]
     match_summary: Optional[str] = None
     analyzed_at: datetime
-    cache_version: int = 3
+    cache_version: int = 4

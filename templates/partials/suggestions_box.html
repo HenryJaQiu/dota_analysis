@@ -1,5 +1,17 @@
 <div class="suggestions-box">
-    <h3 class="suggestions-title">AI 教练建议</h3>
+    <h3 class="suggestions-title">
+        AI 教练建议
+        {% if player.ai_suggestions.model %}
+        <span class="ai-model-tag">{{ player.ai_suggestions.model }}</span>
+        {% endif %}
+        {% if player.ai_suggestions.generated_at %}
+        <span class="ai-generated-at">{{ player.ai_suggestions.generated_at.strftime("%m-%d %H:%M") }}</span>
+        {% endif %}
+    </h3>
+
+    {% if player.ai_suggestions.error %}
+    <div class="ai-error">{{ player.ai_suggestions.error }}</div>
+    {% endif %}
 
     {% if player.ai_suggestions.priority_improvement %}
     <div class="priority-suggestion">

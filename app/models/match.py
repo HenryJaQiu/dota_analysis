@@ -1,5 +1,5 @@
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from enum import Enum
 
 
@@ -77,8 +77,7 @@ class RawPlayer(BaseModel):
     total_xp: Optional[int] = None
     radiant_win: Optional[bool] = None
 
-    class Config:
-        extra = "allow"
+    model_config = ConfigDict(extra="allow")
 
 
 class RawMatch(BaseModel):
@@ -96,5 +95,4 @@ class RawMatch(BaseModel):
     radiant_xp_adv: Optional[List[int]] = None
     picks_bans: Optional[List[Dict[str, Any]]] = None
 
-    class Config:
-        extra = "allow"
+    model_config = ConfigDict(extra="allow")

@@ -1,12 +1,15 @@
 import json
+import os
 from datetime import datetime, date
+
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 
+from app.config import settings
 from app.routers.analysis import router, templates
+from app.routers.llm import router as llm_router
 
-app = FastAPI(title="Dota 2 Match Analyzer", version="1.0.0")
+app = FastAPI(title="Dota 2 Match Analyzer", version="2.0.0")
 
 
 def _json_default(obj):
@@ -16,12 +19,21 @@ def _json_default(obj):
 
 
 # Register tojson filter for Jinja2 templates
-templates.env.filters["tojson"] = lambda obj: json.dumps(obj, ensure_ascii=False, default=_json_default)
+templates.env.filters["tojson"] = lambda obj: json.dumps(
+    obj, ensure_ascii=False, default=_json_default
+)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 app.include_router(router)
+app.include_router(llm_router)
 
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+
+    uvicorn.run(
+        "main:app",
+        host=settings.app_host,
+        port=settings.app_port,
+        reload=os.getenv("APP_RELOAD", "0") == "1",
+    )

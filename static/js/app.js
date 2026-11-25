@@ -140,6 +140,131 @@ if (analyzeForm) {
     });
 }
 
+function initReanalysis() {
+    const btn = document.getElementById("reanalyze-btn");
+    const panel = document.getElementById("reanalyze-status");
+    if (!btn || !panel) return;
+
+    const matchId = btn.dataset.matchId;
+    let timer = null;
+    let reloadTimer = null;
+
+    const setBusy = (busy) => {
+        btn.disabled = busy;
+        btn.textContent = busy ? "生成中…" : "用当前模型重新生成建议";
+    };
+
+    const render = (job) => {
+        const statusLabels = {
+            idle: "等待开始",
+            queued: "排队中",
+            running: "生成中",
+            completed: "已完成",
+            failed: "失败",
+        };
+        panel.classList.remove("hidden");
+        panel.className = `job-progress status-${job.status || "idle"}`;
+        panel.textContent = "";
+
+        const head = document.createElement("div");
+        head.className = "job-progress-head";
+
+        const titleWrap = document.createElement("div");
+        const title = document.createElement("div");
+        title.className = "job-progress-title";
+        title.textContent = `比赛 #${matchId} · AI 建议`;
+        const status = document.createElement("div");
+        status.className = "job-progress-status";
+        status.textContent = statusLabels[job.status] || job.status || "";
+        titleWrap.appendChild(title);
+        titleWrap.appendChild(status);
+        head.appendChild(titleWrap);
+        panel.appendChild(head);
+
+        const message = document.createElement("div");
+        message.className = "job-progress-message";
+        message.textContent = job.message || "";
+        panel.appendChild(message);
+
+        if (job.error) {
+            const error = document.createElement("div");
+            error.className = "job-progress-error";
+            error.textContent = job.error;
+            panel.appendChild(error);
+        }
+    };
+
+    const stopPolling = () => {
+        if (timer) clearInterval(timer);
+        timer = null;
+    };
+
+    const poll = async () => {
+        try {
+            const response = await fetch(`/api/match/${matchId}/reanalyze`, { cache: "no-store" });
+            const job = await response.json();
+            if (!response.ok) throw new Error(job.error || job.detail || "获取状态失败");
+            render(job);
+
+            if (job.status === "completed") {
+                stopPolling();
+                setBusy(false);
+                if (reloadTimer) clearTimeout(reloadTimer);
+                reloadTimer = setTimeout(() => window.location.reload(), 900);
+            } else if (job.status === "failed" || job.status === "idle") {
+                stopPolling();
+                setBusy(false);
+            }
+        } catch (error) {
+            console.error(error);
+            stopPolling();
+            setBusy(false);
+        }
+    };
+
+    const startPolling = () => {
+        stopPolling();
+        poll();
+        timer = setInterval(poll, 2500);
+    };
+
+    btn.addEventListener("click", async () => {
+        setBusy(true);
+        try {
+            const response = await fetch(`/api/match/${matchId}/reanalyze`, { method: "POST" });
+            const job = await response.json();
+            if (!response.ok) {
+                throw new Error(job.error || job.detail || "启动重新生成失败");
+            }
+            render(job);
+            startPolling();
+        } catch (error) {
+            setBusy(false);
+            panel.classList.remove("hidden");
+            panel.className = "job-progress status-failed";
+            panel.textContent = "";
+            const message = document.createElement("div");
+            message.className = "job-progress-error";
+            message.textContent = error.message;
+            panel.appendChild(message);
+        }
+    });
+
+    // Resume the status display if a reanalysis job survived a page refresh.
+    fetch(`/api/match/${matchId}/reanalyze`, { cache: "no-store" })
+        .then((response) => response.json())
+        .then((job) => {
+            if (job.status === "running" || job.status === "queued") {
+                setBusy(true);
+                render(job);
+                startPolling();
+            } else if (job.status === "failed") {
+                render(job);
+            }
+        })
+        .catch(() => {});
+}
+
 document.addEventListener("DOMContentLoaded", function () {
     const queryMatchId = new URLSearchParams(window.location.search).get("match_id");
     const activeJob = localStorage.getItem("activeMatchJob");
@@ -147,6 +272,8 @@ document.addEventListener("DOMContentLoaded", function () {
     if (matchId && document.getElementById("job-progress")) {
         startPolling(matchId);
     }
+
+    initReanalysis();
 
     const hash = window.location.hash;
     if (hash && hash.startsWith("#player-")) {
