@@ -265,6 +265,91 @@ function initReanalysis() {
         .catch(() => {});
 }
 
+function initParseWatcher() {
+    const box = document.getElementById("parse-watch");
+    if (!box) return;
+
+    const matchId = box.dataset.matchId;
+    const message = document.getElementById("parse-status-message");
+    const retry = document.getElementById("parse-retry-btn");
+    let timer = null;
+
+    const setMessage = (text) => {
+        if (message) message.textContent = text;
+    };
+    const stop = () => {
+        if (timer) clearInterval(timer);
+        timer = null;
+    };
+    const setRetry = (enabled) => {
+        if (retry) retry.disabled = !enabled;
+    };
+
+    const poll = async () => {
+        try {
+            const response = await fetch(`/api/match/${matchId}/parse`, { cache: "no-store" });
+            const job = await response.json();
+            if (!response.ok) {
+                throw new Error(job.error || job.detail || "获取解析状态失败");
+            }
+
+            if (job.ready) {
+                stop();
+                setRetry(false);
+                setMessage("录像解析完成，正在刷新页面…");
+                setTimeout(() => window.location.reload(), 700);
+                return;
+            }
+
+            if (job.status === "running" || job.status === "queued") {
+                setRetry(false);
+                setMessage(job.message || "正在等待录像解析…");
+            } else if (job.status === "failed") {
+                stop();
+                setRetry(true);
+                setMessage(job.error || "录像仍未解析完成，稍后刷新页面会自动重试。");
+            } else if (job.status === "completed") {
+                stop();
+                setRetry(true);
+                setMessage(job.message || "解析任务已结束，但数据尚未更新，请刷新页面重试。");
+            } else if (job.status === "idle") {
+                stop();
+                setRetry(true);
+                setMessage("解析任务尚未启动，可点击「重新检查解析」。");
+            }
+        } catch (error) {
+            console.error(error);
+            stop();
+            setRetry(true);
+            setMessage(`获取解析状态失败：${error.message}`);
+        }
+    };
+
+    const start = () => {
+        stop();
+        poll();
+        timer = setInterval(poll, 3000);
+    };
+
+    retry?.addEventListener("click", async () => {
+        setRetry(false);
+        setMessage("正在重新提交解析请求…");
+        try {
+            const response = await fetch(`/api/match/${matchId}/parse`, { method: "POST" });
+            const job = await response.json();
+            if (!response.ok) {
+                throw new Error(job.error || job.detail || "启动解析失败");
+            }
+            start();
+        } catch (error) {
+            setRetry(true);
+            setMessage(`重新检查失败：${error.message}`);
+        }
+    });
+
+    start();
+}
+
 document.addEventListener("DOMContentLoaded", function () {
     const queryMatchId = new URLSearchParams(window.location.search).get("match_id");
     const activeJob = localStorage.getItem("activeMatchJob");
@@ -274,6 +359,7 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     initReanalysis();
+    initParseWatcher();
 
     const hash = window.location.hash;
     if (hash && hash.startsWith("#player-")) {

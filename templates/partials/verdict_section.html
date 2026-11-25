@@ -1,0 +1,92 @@
+{% if analysis.verdict %}
+<section class="verdict-section">
+    <div class="verdict-head">
+        <div>
+            <h2>本局分锅</h2>
+            <p>基于录像解析数据评估，仅供复盘参考，不代表唯一结论。</p>
+        </div>
+        <span class="verdict-badge">数据模型</span>
+    </div>
+
+    <div class="verdict-grid">
+        <article class="verdict-card verdict-blame">
+            <div class="verdict-kicker">败方最大责任 · {{ analysis.verdict.loser_team }}</div>
+            <div class="verdict-player">
+                <span class="verdict-hero">{{ analysis.verdict.most_responsible.hero_name }}</span>
+                <span class="verdict-name">{{ analysis.verdict.most_responsible.personaname or "匿名" }}</span>
+                <span class="verdict-role">{{ analysis.verdict.most_responsible.role }}</span>
+            </div>
+            <div class="verdict-score-row">
+                <span class="verdict-score-label">表现评分</span>
+                <strong>{{ "%.1f"|format(analysis.verdict.most_responsible.score) }}</strong>
+                <span class="verdict-score-max">/ 100</span>
+                <span class="verdict-score-hint">越低责任越大</span>
+            </div>
+            <ul class="verdict-reasons">
+                {% for reason in analysis.verdict.most_responsible.reasons %}
+                <li>{{ reason }}</li>
+                {% endfor %}
+            </ul>
+            <details class="verdict-details">
+                <summary>查看败方五人排名</summary>
+                <ol class="verdict-ranking">
+                    {% for player in analysis.verdict.loser_rankings %}
+                    <li>
+                        <span class="ranking-index">{{ player.rank }}</span>
+                        <span class="ranking-main">
+                            <span class="ranking-name">{{ player.hero_name }}{% if player.personaname %} <em>{{ player.personaname }}</em>{% endif %}</span>
+                            <span class="ranking-role">{{ player.role }}</span>
+                        </span>
+                        <span class="ranking-score">{{ "%.1f"|format(player.score) }}</span>
+                        <span class="ranking-bar"><i style="width: {{ player.score }}%"></i></span>
+                    </li>
+                    {% endfor %}
+                </ol>
+            </details>
+        </article>
+
+        <article class="verdict-card verdict-mvp">
+            <div class="verdict-kicker">胜方最佳 · {{ analysis.verdict.winner_team }}</div>
+            <div class="verdict-player">
+                <span class="verdict-hero">{{ analysis.verdict.best_player.hero_name }}</span>
+                <span class="verdict-name">{{ analysis.verdict.best_player.personaname or "匿名" }}</span>
+                <span class="verdict-role">{{ analysis.verdict.best_player.role }}</span>
+            </div>
+            <div class="verdict-score-row">
+                <span class="verdict-score-label">表现评分</span>
+                <strong>{{ "%.1f"|format(analysis.verdict.best_player.score) }}</strong>
+                <span class="verdict-score-max">/ 100</span>
+                <span class="verdict-score-hint">越高表现越好</span>
+            </div>
+            <ul class="verdict-reasons">
+                {% for reason in analysis.verdict.best_player.reasons %}
+                <li>{{ reason }}</li>
+                {% endfor %}
+            </ul>
+            <details class="verdict-details">
+                <summary>查看胜方五人排名</summary>
+                <ol class="verdict-ranking">
+                    {% for player in analysis.verdict.winner_rankings %}
+                    <li>
+                        <span class="ranking-index">{{ player.rank }}</span>
+                        <span class="ranking-main">
+                            <span class="ranking-name">{{ player.hero_name }}{% if player.personaname %} <em>{{ player.personaname }}</em>{% endif %}</span>
+                            <span class="ranking-role">{{ player.role }}</span>
+                        </span>
+                        <span class="ranking-score">{{ "%.1f"|format(player.score) }}</span>
+                        <span class="ranking-bar"><i style="width: {{ player.score }}%"></i></span>
+                    </li>
+                    {% endfor %}
+                </ol>
+            </details>
+        </article>
+    </div>
+
+    <p class="verdict-method">{{ analysis.verdict.methodology }}</p>
+</section>
+{% elif analysis.parse_status.value != 'parsed' %}
+<div class="verdict-pending">
+    <strong>分锅分析待生成</strong>
+    <span>录像解析完成后，会结合经济、伤害、参团、视野与目标控制，评估败方最大责任和胜方最佳玩家。</span>
+</div>
+{% endif %}

@@ -6,6 +6,7 @@ from typing import Dict, Optional
 logger = logging.getLogger(__name__)
 
 KIND_ANALYSIS = "analysis"
+KIND_PARSE = "parse"
 KIND_REANALYZE = "reanalyze"
 
 

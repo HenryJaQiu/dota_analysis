@@ -35,14 +35,27 @@
         </div>
     </div>
     {% if analysis.parse_status.value != 'parsed' %}
-    <div class="parse-warning">
-        当前比赛录像尚未完成解析，视野、对线等高级数据可能暂时不可用。
-        {% if parse_refreshing %}
-        系统已在后台重新检查解析状态，刷新页面后如果录像完成解析会自动升级为完整数据。
-        {% endif %}
+    <div class="parse-warning" id="parse-watch"
+         data-match-id="{{ analysis.match_id }}"
+         data-parse-status="{{ analysis.parse_status.value }}">
+        <div class="parse-warning-main">
+            <strong>当前为基础数据</strong>：视野、对线、经济曲线等需要录像解析，AI 建议和分锅分析会在解析完成后自动生成。
+            <span id="parse-status-message">
+            {% if parse_refreshing %}
+            已提交解析请求，正在后台等待 OpenDota 处理，完成后页面会自动刷新。
+            {% else %}
+            解析尚未完成，可点击右侧按钮重新检查。
+            {% endif %}
+            </span>
+        </div>
+        <div class="parse-warning-actions">
+            <button type="button" class="btn-secondary" id="parse-retry-btn">重新检查解析</button>
+        </div>
     </div>
     {% endif %}
 </div>
+
+{% include "partials/verdict_section.html" %}
 
 <div class="teams-container">
     <div class="team-tabs">
@@ -124,5 +137,5 @@ window.MATCH_DATA = {{ analysis.model_dump(mode="json") | tojson | safe }};
 </script>
 {% endblock %}
 {% block scripts %}
-<script src="/static/js/charts.js?v=20261125c"></script>
+<script src="/static/js/charts.js?v=20261125f"></script>
 {% endblock %}

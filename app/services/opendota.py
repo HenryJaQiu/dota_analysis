@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from typing import Dict, Optional
+from typing import Awaitable, Callable, Dict, Optional
 
 import httpx
 
@@ -88,10 +88,16 @@ class OpenDotaClient:
                 return ParseStatus.PARSED
         return ParseStatus.NOT_PARSED
 
-    async def wait_for_parse(self, match_id: int):
+    async def wait_for_parse(
+        self,
+        match_id: int,
+        on_progress: Optional[Callable[[int, int], Awaitable[None]]] = None,
+    ):
         await self.request_parse(match_id)
         for attempt in range(settings.parse_max_attempts):
             await asyncio.sleep(settings.parse_poll_interval)
+            if on_progress is not None:
+                await on_progress(attempt + 1, settings.parse_max_attempts)
             try:
                 match = await self.fetch_match(match_id)
                 status = self.detect_parse_status(match)

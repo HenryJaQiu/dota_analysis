@@ -36,11 +36,13 @@ class Settings(BaseSettings):
     app_host: str = "127.0.0.1"
     app_port: int = 8000
     cache_dir: str = "cache/matches"
-    cache_ttl_seconds: int = 86400
+    raw_cache_dir: str = "cache/raw"
+    # 0 = keep downloaded matches forever for later review.
+    cache_ttl_seconds: int = 0
     opendota_base_url: str = "https://api.opendota.com/api"
     opendota_rate_limit: float = 1.0
     parse_poll_interval: int = 10
-    parse_max_attempts: int = 12
+    parse_max_attempts: int = 30
 
 
 settings = Settings()

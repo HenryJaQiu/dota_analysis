@@ -97,6 +97,27 @@ class PlayerAnalysis(BaseModel):
     ai_suggestions: Optional[AISuggestions] = None
 
 
+class PlayerVerdict(BaseModel):
+    player_slot: int
+    personaname: Optional[str] = None
+    hero_name: str
+    team: str
+    role: str = ""
+    score: float = 0.0
+    rank: int = 0
+    reasons: List[str] = []
+
+
+class MatchVerdict(BaseModel):
+    winner_team: str
+    loser_team: str
+    best_player: PlayerVerdict
+    most_responsible: PlayerVerdict
+    winner_rankings: List[PlayerVerdict] = []
+    loser_rankings: List[PlayerVerdict] = []
+    methodology: str = ""
+
+
 class MatchAnalysis(BaseModel):
     match_id: int
     duration_minutes: float
@@ -105,4 +126,5 @@ class MatchAnalysis(BaseModel):
     players: List[PlayerAnalysis]
     match_summary: Optional[str] = None
     analyzed_at: datetime
+    verdict: Optional[MatchVerdict] = None
     cache_version: int = 4

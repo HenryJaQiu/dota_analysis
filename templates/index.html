@@ -58,6 +58,9 @@
                 <span class="recent-result {% if item.radiant_win %}radiant-win{% else %}dire-win{% endif %}">
                     {% if item.radiant_win %}天辉胜{% else %}夜魇胜{% endif %}
                 </span>
+                <span class="recent-parse {% if item.parse_status == 'parsed' %}is-full{% else %}is-basic{% endif %}">
+                    {% if item.parse_status == 'parsed' %}完整{% else %}基础{% endif %}
+                </span>
                 <span class="recent-time">{{ item.analyzed_at }}</span>
             </a>
         </li>

@@ -14,6 +14,7 @@ from app.models.analysis import (
 )
 from app.utils.hero_names import resolve_hero_name
 from app.utils.item_names import resolve_item_name, resolve_rank_name
+from app.services.verdict import build_match_verdict
 
 LANE_NAMES = {1: "优势路", 2: "中路", 3: "劣势路", 4: "野区"}
 
@@ -29,7 +30,7 @@ class DataProcessor:
             self._process_player(p, raw, parse_status, objectives)
             for p in raw.players
         ]
-        return MatchAnalysis(
+        analysis = MatchAnalysis(
             match_id=raw.match_id,
             duration_minutes=raw.duration / 60.0,
             radiant_win=raw.radiant_win,
@@ -37,6 +38,9 @@ class DataProcessor:
             players=players,
             analyzed_at=datetime.utcnow(),
         )
+        if parse_status == ParseStatus.PARSED:
+            analysis.verdict = build_match_verdict(analysis)
+        return analysis
 
     def _process_player(
         self,
