@@ -71,6 +71,9 @@ python main.py
 2. 选择模型来源（默认 **OpenCode Go**）
 3. 填写 API Key（OpenCode Go 的 Key 在 [opencode.ai/auth](https://opencode.ai/auth) 获取）
 4. 点击「拉取列表」选择模型，默认 `deepseek-v4.1-flash`
+   - 列表会显示所有可对话模型，并自动过滤 embedding / decision 等不能聊天的类型
+   - 模型按 OpenAI / Anthropic 协议分组，选择后自动同步模型 ID 与协议
+   - 也可以不拉取列表，直接在「模型 ID」输入框中手动填写
 5. 点击「测试连接」确认可用，再点「保存设置」
 6. 回到首页输入比赛 ID 开始分析
 

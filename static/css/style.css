@@ -1114,6 +1114,27 @@ select.form-input { cursor: pointer; }
     margin-top: 6px;
 }
 
+.model-manual-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 8px;
+}
+
+.model-manual-row label {
+    margin: 0;
+    white-space: nowrap;
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+}
+
+.model-manual-row .form-input {
+    flex: 1;
+    min-width: 0;
+    padding: 7px 10px;
+    font-size: 0.85rem;
+}
+
 .form-hint a { color: var(--accent); }
 .form-hint.is-warning { color: var(--priority); }
 
@@ -1188,4 +1209,6 @@ select.form-input { cursor: pointer; }
     .model-chip { max-width: 62vw; }
     .settings-actions { width: 100%; justify-content: flex-end; }
     .page-actions { align-items: flex-start; }
+    .model-manual-row { align-items: flex-start; flex-direction: column; gap: 6px; }
+    .model-manual-row .form-input { width: 100%; }
 }

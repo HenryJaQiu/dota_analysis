@@ -366,7 +366,17 @@ async def list_models(
     except Exception as exc:
         raise LLMError("模型列表接口返回的不是 JSON") from exc
 
-    items = payload.get("data") if isinstance(payload, dict) else payload
+    if isinstance(payload, dict):
+        items = (
+            payload.get("data")
+            or payload.get("models")
+            or payload.get("result")
+            or payload.get("items")
+        )
+        if isinstance(items, dict):
+            items = items.get("models") or items.get("data")
+    else:
+        items = payload
     if not isinstance(items, list):
         raise LLMError("模型列表格式无法识别")
 

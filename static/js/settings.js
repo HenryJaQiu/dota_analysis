@@ -4,6 +4,7 @@
     const state = {
         settings: null,
         presets: {},
+        models: [],
         modelProtocols: {},
         loading: false,
         lastProvider: null,
@@ -107,13 +108,121 @@
         }
     }
 
+    function modelOptionLabel(model) {
+        if (model.name && model.name !== model.id) {
+            return `${model.name} — ${model.id}`;
+        }
+        return model.id;
+    }
+
+    function resetModelSelect(currentModel) {
+        const select = $("llm-model-select");
+        if (!select) return;
+        select.innerHTML = "";
+        select.add(new Option("点击「拉取列表」加载全部模型", ""));
+        if (!currentModel) {
+            return;
+        }
+        select.add(new Option(currentModel, currentModel));
+        select.value = currentModel;
+    }
+
+    function populateModelSelect(models, selectedId) {
+        const select = $("llm-model-select");
+        if (!select) return;
+
+        select.innerHTML = "";
+        select.add(new Option(`从列表选择（共 ${models.length} 个）`, ""));
+
+        const groups = [
+            ["openai", "OpenAI 兼容"],
+            ["anthropic", "Anthropic 兼容"],
+            ["auto", "自动识别"],
+        ];
+        let added = 0;
+        groups.forEach(([protocol, label]) => {
+            const items = models.filter((model) => (model.protocol || "auto") === protocol);
+            if (!items.length) return;
+            const group = document.createElement("optgroup");
+            group.label = `${label}（${items.length}）`;
+            items.forEach((model) => {
+                group.appendChild(new Option(modelOptionLabel(model), model.id));
+                added += 1;
+            });
+            select.appendChild(group);
+        });
+
+        if (!added) {
+            select.add(new Option("没有可用模型，请手动输入", ""));
+        }
+
+        if (selectedId) {
+            const exists = Array.from(select.options).some((option) => option.value === selectedId);
+            if (!exists) {
+                select.add(new Option(`当前输入：${selectedId}（不在列表中）`, selectedId));
+            }
+            select.value = selectedId;
+        } else {
+            select.value = "";
+        }
+    }
+
+    function syncSelectWithInput(modelId) {
+        const select = $("llm-model-select");
+        if (!select) return;
+
+        const manual = select.querySelector('option[data-manual="1"]');
+        if (!modelId) {
+            if (manual) manual.remove();
+            select.value = "";
+            return;
+        }
+
+        const exists = Array.from(select.options).some(
+            (option) => option.value === modelId && option.dataset.manual !== "1"
+        );
+        if (exists) {
+            if (manual) manual.remove();
+            select.value = modelId;
+            return;
+        }
+
+        let option = manual;
+        if (!option) {
+            option = document.createElement("option");
+            option.dataset.manual = "1";
+            select.appendChild(option);
+        }
+        option.value = modelId;
+        option.textContent = `手动输入：${modelId}`;
+        select.value = modelId;
+    }
+
+    function applyProtocolForModel(modelId) {
+        const protocol = state.modelProtocols[modelId];
+        if (!protocol || protocol === "auto") return;
+        $("llm-protocol").value = protocol;
+        const hint = $("llm-model-hint");
+        if (hint) {
+            const label = protocol === "anthropic" ? "Anthropic" : "OpenAI";
+            hint.textContent = `已选择 ${modelId}，自动使用 ${label} 协议。`;
+            hint.classList.remove("is-warning");
+        }
+    }
+
     function fillForm(settings) {
         if (!settings) return;
         buildProviderOptions(settings.providers || []);
 
+        const currentModel = settings.model || "";
         $("llm-provider").value = settings.provider;
         $("llm-base-url").value = settings.base_url || "";
-        $("llm-model").value = settings.model || "";
+        $("llm-model").value = currentModel;
+        if (state.models.length) {
+            populateModelSelect(state.models, currentModel);
+        } else {
+            resetModelSelect(currentModel);
+        }
         $("llm-protocol").value = settings.protocol || "auto";
         $("llm-temperature").value = settings.temperature;
         $("llm-max-tokens").value = settings.max_tokens;
@@ -133,9 +242,13 @@
 
         const modelHint = $("llm-model-hint");
         if (modelHint) {
-            modelHint.textContent = settings.model
-                ? `当前模型：${settings.model}`
-                : "可直接手动输入模型 ID，或从服务端拉取模型列表。";
+            if (state.models.length) {
+                modelHint.textContent = `当前模型：${currentModel || "未选择"}。列表中有 ${state.models.length} 个可用模型，可重新选择或手动修改。`;
+            } else {
+                modelHint.textContent = currentModel
+                    ? `当前模型：${currentModel}。可点击「拉取列表」选择其他模型，或直接手动输入。`
+                    : "从上方列表选择模型，或直接手动输入模型 ID。";
+            }
         }
     }
 
@@ -304,32 +417,32 @@
         try {
             const response = await fetch(`/api/llm/models?${params.toString()}`, { cache: "no-store" });
             const result = await readJson(response);
-            const datalist = $("llm-model-options");
-            datalist.innerHTML = "";
+            const models = result.models || [];
+
+            state.models = models;
             state.modelProtocols = {};
-            (result.models || []).forEach((model) => {
+            models.forEach((model) => {
                 state.modelProtocols[model.id] = model.protocol || "auto";
-                const option = document.createElement("option");
-                option.value = model.id;
-                option.label = model.name && model.name !== model.id
-                    ? `${model.name}（${model.id}）`
-                    : model.id;
-                datalist.appendChild(option);
             });
 
-            const count = (result.models || []).length;
+            const currentModel = $("llm-model").value.trim();
+            populateModelSelect(models, currentModel);
+
+            const count = models.length;
+            const openaiCount = models.filter((model) => (model.protocol || "auto") === "openai").length;
+            const anthropicCount = models.filter((model) => model.protocol === "anthropic").length;
             if (hint) {
                 const source = result.source === "remote" ? "远程接口" : "预设列表";
                 const skipped = result.skipped
-                    ? `，已忽略 ${result.skipped} 个不支持的类型`
+                    ? `，已过滤 ${result.skipped} 个 embedding/decision 模型`
                     : "";
-                hint.textContent = `已获取 ${count} 个可用模型（${source}，${result.resolved_protocol} 协议${skipped}）。可输入关键字筛选或直接手动填写。`;
+                hint.textContent = `已获取 ${count} 个对话模型（OpenAI 兼容 ${openaiCount} 个，Anthropic 兼容 ${anthropicCount} 个；${source}${skipped}）。从上方下拉框选择，或手动输入模型 ID。`;
                 hint.classList.toggle("is-warning", result.source !== "remote");
             }
             if (result.warning) {
                 setStatus(result.warning, "warning");
             } else {
-                setStatus(`模型列表已更新，共 ${count} 个。`, "success");
+                setStatus(`模型列表已更新，共 ${count} 个对话模型。`, "success");
             }
         } catch (error) {
             if (hint) {
@@ -400,7 +513,9 @@
             $("llm-base-url").value = preset.base_url || "";
             $("llm-model").value = preset.default_model || "";
             $("llm-protocol").value = preset.protocol || "auto";
-            $("llm-model-options").innerHTML = "";
+            state.models = [];
+            state.modelProtocols = {};
+            resetModelSelect(preset.default_model || "");
             state.lastProvider = providerId;
             updateProviderHint(providerId, state.settings);
 
@@ -421,16 +536,21 @@
 
         $("llm-refresh-models")?.addEventListener("click", refreshModels);
 
+        $("llm-model")?.addEventListener("input", () => {
+            syncSelectWithInput($("llm-model").value.trim());
+        });
+
         $("llm-model")?.addEventListener("change", () => {
             const modelId = $("llm-model").value.trim();
-            const protocol = state.modelProtocols[modelId];
-            if (!protocol || protocol === "auto") return;
-            $("llm-protocol").value = protocol;
-            const hint = $("llm-model-hint");
-            if (hint) {
-                hint.textContent = `已选择 ${modelId}，自动使用 ${protocol} 协议。`;
-                hint.classList.remove("is-warning");
-            }
+            syncSelectWithInput(modelId);
+            applyProtocolForModel(modelId);
+        });
+
+        $("llm-model-select")?.addEventListener("change", (event) => {
+            const modelId = event.target.value;
+            if (!modelId) return;
+            $("llm-model").value = modelId;
+            applyProtocolForModel(modelId);
         });
 
         $("llm-save")?.addEventListener("click", saveSettings);
