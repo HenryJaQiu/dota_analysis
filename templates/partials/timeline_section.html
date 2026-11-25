@@ -1,0 +1,25 @@
+{% if analysis.timeline %}
+<details class="timeline-section" id="timeline">
+    <summary>比赛时间轴 · 肉山 / 防御塔 / 买活 / 关键装备（{{ analysis.timeline|length }}）</summary>
+    <div class="timeline-list">
+        {% for event in analysis.timeline %}
+        <div class="timeline-event timeline-{{ event.type }}">
+            <span class="timeline-time">{{ event.time_str }}</span>
+            <span class="timeline-badge">{{ event.type_label }}</span>
+            <span class="timeline-label">{{ event.label }}</span>
+            {% if event.hero_name %}
+            <span class="timeline-hero">{{ event.hero_name }}</span>
+            {% endif %}
+            {% if event.detail %}
+            <span class="timeline-detail">{{ event.detail }}</span>
+            {% endif %}
+            {% if event.team %}
+            <span class="timeline-team {% if event.team == '天辉' %}radiant-text{% else %}dire-text{% endif %}">
+                {{ event.team }}
+            </span>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</details>
+{% endif %}

@@ -126,6 +126,10 @@ class OpenDotaClient:
             if isinstance(hero, dict) and hero.get("id") is not None
         }
 
+    async def fetch_hero_matchups(self, hero_id: int) -> list:
+        data = await self._get(f"/heroes/{int(hero_id)}/matchups")
+        return data if isinstance(data, list) else []
+
     async def fetch_items(self) -> Dict[int, str]:
         data = await self._get("/constants/items")
         result = {}

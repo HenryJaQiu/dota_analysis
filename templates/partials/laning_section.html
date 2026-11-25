@@ -28,6 +28,56 @@
     </div>
     {% endif %}
 </div>
+
+{% if player.laning.lane_score is not none or player.laning.opponents %}
+<div class="lane-evaluation">
+    <h3>对线评价</h3>
+    <div class="stats-grid">
+        {% if player.laning.lane_score is not none %}
+        <div class="stat-card">
+            <div class="stat-label">对线评分</div>
+            <div class="stat-value {% if player.laning.lane_score >= 60 %}good{% elif player.laning.lane_score < 40 %}bad{% else %}ok{% endif %}">
+                {{ "%.1f"|format(player.laning.lane_score) }}
+            </div>
+            {% if player.laning.summary %}<div class="stat-sub">{{ player.laning.summary }}</div>{% endif %}
+        </div>
+        {% endif %}
+        {% if player.laning.gold_diff_10 is not none %}
+        <div class="stat-card">
+            <div class="stat-label">10 分钟经济差</div>
+            <div class="stat-value {% if player.laning.gold_diff_10 > 0 %}good{% elif player.laning.gold_diff_10 < 0 %}bad{% endif %}">
+                {% if player.laning.gold_diff_10 > 0 %}+{% endif %}{{ player.laning.gold_diff_10 }}
+            </div>
+        </div>
+        {% endif %}
+        {% if player.laning.xp_diff_10 is not none %}
+        <div class="stat-card">
+            <div class="stat-label">10 分钟经验差</div>
+            <div class="stat-value {% if player.laning.xp_diff_10 > 0 %}good{% elif player.laning.xp_diff_10 < 0 %}bad{% endif %}">
+                {% if player.laning.xp_diff_10 > 0 %}+{% endif %}{{ player.laning.xp_diff_10 }}
+            </div>
+        </div>
+        {% endif %}
+        {% if player.laning.lh_diff_10 is not none %}
+        <div class="stat-card">
+            <div class="stat-label">10 分钟补刀差</div>
+            <div class="stat-value {% if player.laning.lh_diff_10 > 0 %}good{% elif player.laning.lh_diff_10 < 0 %}bad{% endif %}">
+                {% if player.laning.lh_diff_10 > 0 %}+{% endif %}{{ player.laning.lh_diff_10 }}
+            </div>
+        </div>
+        {% endif %}
+        {% if player.laning.matchup_score is not none %}
+        <div class="stat-card">
+            <div class="stat-label">对位英雄胜率</div>
+            <div class="stat-value">{{ "%.0f"|format(player.laning.matchup_score) }}%</div>
+        </div>
+        {% endif %}
+    </div>
+    {% if player.laning.opponents %}
+    <p class="lane-opponents">对线对手：{{ player.laning.opponents|join("、") }}</p>
+    {% endif %}
+</div>
+{% endif %}
 {% else %}
 <div class="no-data-section">
     <p class="no-data">对线数据需解析录像后可用</p>

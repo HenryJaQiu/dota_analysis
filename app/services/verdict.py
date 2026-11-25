@@ -27,23 +27,26 @@ PROFILE_LABELS = {
 # Base weights. Profiles apply multipliers below and then normalize.
 BASE_WEIGHTS = {
     "core": {
-        "gpm": 0.12,
-        "xpm": 0.05,
-        "last_hits": 0.07,
-        "net_worth": 0.07,
+        "gpm": 0.11,
+        "xpm": 0.04,
+        "last_hits": 0.06,
+        "net_worth": 0.06,
         "economy_share": 0.05,
-        "hero_damage": 0.13,
-        "damage_share": 0.06,
+        "hero_damage": 0.12,
+        "damage_share": 0.05,
         "tower_damage": 0.04,
         "tower_share": 0.03,
-        "kda": 0.12,
+        "kda": 0.11,
         "deaths": 0.05,
-        "key_deaths": 0.07,
-        "participation": 0.05,
+        "key_deaths": 0.05,
+        "teamfight_deaths": 0.03,
+        "participation": 0.03,
         "kill_share": 0.04,
         "vision": 0.01,
         "healing": 0.01,
         "objectives": 0.03,
+        "lane_evaluation": 0.05,
+        "item_timing": 0.03,
     },
     "support": {
         "gpm": 0.03,
@@ -51,18 +54,21 @@ BASE_WEIGHTS = {
         "last_hits": 0.02,
         "net_worth": 0.02,
         "economy_share": 0.02,
-        "hero_damage": 0.08,
+        "hero_damage": 0.07,
         "damage_share": 0.04,
         "tower_damage": 0.01,
         "tower_share": 0.01,
-        "kda": 0.10,
-        "deaths": 0.08,
-        "key_deaths": 0.09,
-        "participation": 0.12,
+        "kda": 0.09,
+        "deaths": 0.07,
+        "key_deaths": 0.06,
+        "teamfight_deaths": 0.04,
+        "participation": 0.09,
         "kill_share": 0.08,
-        "vision": 0.16,
-        "healing": 0.05,
+        "vision": 0.15,
+        "healing": 0.04,
         "objectives": 0.06,
+        "lane_evaluation": 0.05,
+        "item_timing": 0.02,
     },
 }
 
@@ -128,11 +134,13 @@ _IGNORE_ALL_ZERO = {
     "healing",
     "objectives",
     "key_deaths",
+    "teamfight_deaths",
 }
 
 METHODOLOGY = (
     "评分综合 KDA、经济、伤害、参团、死亡、视野与目标控制；"
-    "GPM / 补刀 / 英雄伤害会与 OpenDota 同英雄基准混合，死亡会结合团战时间点；"
+    "GPM / 补刀 / 英雄伤害会与 OpenDota 同英雄基准混合，对线结合 lane_role、对位英雄克制与 10 分钟经济/经验/补刀差；"
+    "死亡会结合团战时间点，装备会参考关键装备购买时间；"
     "经济、伤害、推塔、参团击杀使用队内占比，并按核心 / 辅助位置和所选模式加权。"
     "分数为同队内相对评分，越高代表本场贡献越大；分锅结果仅供复盘参考。"
 )
@@ -279,6 +287,10 @@ METRICS = [
         lambda p, c: p.key_deaths, lambda v: f"{v:.0f} 次",
     ),
     MetricSpec(
+        "teamfight_deaths", "团战死亡", "discipline", False,
+        lambda p, c: p.teamfight_deaths, lambda v: f"{v:.0f} 次",
+    ),
+    MetricSpec(
         "participation", "参团率", "team", True,
         _participation, _fmt_pct,
     ),
@@ -297,6 +309,14 @@ METRICS = [
     MetricSpec(
         "objectives", "目标参与", "objective", True,
         _objective_score, _fmt_one,
+    ),
+    MetricSpec(
+        "lane_evaluation", "对线评价", "lane", True,
+        lambda p, c: p.laning.lane_score, _fmt_one,
+    ),
+    MetricSpec(
+        "item_timing", "关键装备时机", "items", True,
+        lambda p, c: p.items.key_item_score, _fmt_one,
     ),
 ]
 
@@ -600,6 +620,13 @@ def _player_breakdown(
             note = f"队内 {row.team_pct:.1f} / 英雄基准 {row.benchmark:.1f}"
         elif row.spec.key == "key_deaths":
             note = f"团战相关死亡 {player.teamfight_deaths} 次"
+        elif row.spec.key == "lane_evaluation" and player.laning.summary:
+            note = player.laning.summary
+        elif row.spec.key == "item_timing" and player.items.key_items:
+            note = " · ".join(
+                f"{item.get('item', '')} {item.get('time_str', '')}"
+                for item in player.items.key_items[:3]
+            )
         else:
             note = None
         metrics.append(
@@ -695,6 +722,79 @@ def _build_team_verdicts(
     return verdicts
 
 
+def _compute_confidence(match: MatchAnalysis):
+    players = match.players
+    count = max(1, len(players))
+
+    hero_roles = sum(1 for p in players if p.hero_roles) / count
+    benchmark_hits = 0
+    for player in players:
+        for value in (
+            player.economy.gpm_benchmark_pct,
+            player.economy.lh_benchmark_pct,
+            player.teamfight.hero_damage_benchmark_pct,
+        ):
+            if value is not None:
+                benchmark_hits += 1
+    benchmarks = benchmark_hits / (count * 3)
+    lane = sum(1 for p in players if p.laning.lane_score is not None) / count
+    matchup = sum(1 for p in players if p.laning.matchup_score is not None) / count
+    death_timing = sum(1 for p in players if p.death_timing_available) / count
+    vision = sum(1 for p in players if p.vision.available) / count
+    participation = sum(
+        1 for p in players if p.teamfight.participation_rate is not None
+    ) / count
+    item_timing = sum(1 for p in players if p.items.key_item_score is not None) / count
+    timeline = 1.0 if match.timeline else 0.0
+
+    confidence = (
+        0.10
+        + 0.10 * hero_roles
+        + 0.15 * benchmarks
+        + 0.20 * lane
+        + 0.05 * matchup
+        + 0.15 * death_timing
+        + 0.10 * vision
+        + 0.05 * participation
+        + 0.05 * item_timing
+        + 0.05 * timeline
+    )
+    confidence = max(0.0, min(1.0, round(confidence, 2)))
+
+    evidence = []
+    if hero_roles < 0.5:
+        evidence.append("缺少英雄定位数据，位置判断回退到经济/补刀")
+    if benchmarks < 0.5:
+        evidence.append("缺少同英雄基准数据，GPM/补刀/伤害部分回退到队内百分位")
+    if lane < 0.5:
+        evidence.append("缺少对线数据（10 分钟经济/经验/补刀或对线对手）")
+    if matchup < 0.5:
+        evidence.append("缺少英雄对位胜率，无法修正英雄克制影响")
+    if death_timing < 0.5:
+        evidence.append("缺少死亡时间/团战窗口，无法计算关键死亡")
+    if vision < 0.5:
+        evidence.append("缺少视野数据")
+    if participation < 0.5:
+        evidence.append("缺少团战参与率")
+    if item_timing < 0.5:
+        evidence.append("缺少关键装备购买时间")
+    if timeline <= 0:
+        evidence.append("缺少比赛时间轴（肉山/防御塔/买活/关键装备）")
+
+    if confidence >= 0.85:
+        label = "高"
+    elif confidence >= 0.65:
+        label = "中"
+    elif confidence >= 0.45:
+        label = "低"
+    else:
+        label = "证据不足"
+        if not evidence:
+            evidence.append("关键数据覆盖不足，分锅结果可靠性较低")
+
+    return confidence, label, evidence
+
+
 def build_match_verdict(
     match: MatchAnalysis, profile: Optional[str] = None
 ) -> Optional[MatchVerdict]:
@@ -719,6 +819,8 @@ def build_match_verdict(
     if not winner_rankings or not loser_rankings:
         return None
 
+    confidence, confidence_label, evidence = _compute_confidence(match)
+
     return MatchVerdict(
         winner_team=winner_team,
         loser_team=loser_team,
@@ -729,4 +831,7 @@ def build_match_verdict(
         methodology=METHODOLOGY,
         profile=selected,
         profile_label=PROFILE_LABELS[selected],
+        confidence=confidence,
+        confidence_label=confidence_label,
+        evidence=evidence,
     )

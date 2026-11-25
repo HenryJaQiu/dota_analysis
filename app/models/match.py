@@ -67,11 +67,14 @@ class RawPlayer(BaseModel):
     teamfight_participation: Optional[float] = None
     gold_t: Optional[List[int]] = None
     xp_t: Optional[List[int]] = None
+    lh_t: Optional[List[int]] = None
     lane: Optional[int] = None
     lane_role: Optional[int] = None
     is_roaming: Optional[bool] = None
     purchase_log: Optional[List[Dict[str, Any]]] = None
     deaths_log: Optional[List[Dict[str, Any]]] = None
+    buyback_log: Optional[List[Dict[str, Any]]] = None
+    buyback_count: Optional[int] = None
     actions_per_min: Optional[int] = None
     life_state_dead: Optional[int] = None
     total_gold: Optional[int] = None

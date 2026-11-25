@@ -16,6 +16,7 @@ from app.services.analysis_jobs import (
 )
 from app.services.cache import get_cache
 from app.services.data_processor import DataProcessor
+from app.services.hero_matchups import get_hero_matchups
 from app.services.llm_settings import get_llm_config, public_settings
 from app.services.opendota import MatchNotFoundError, OpenDotaAPIError, get_client
 from app.services.verdict import PROFILE_LABELS, build_match_verdict, resolve_profile
@@ -316,8 +317,15 @@ async def _process_match(
     await jobs.set_progress(match_id, "正在加载英雄与道具映射", kind=kind)
     hero_map, item_map, hero_roles = await _load_maps(client)
 
+    matchups = {}
+    if parse_status == ParseStatus.PARSED:
+        await jobs.set_progress(match_id, "正在获取英雄对位数据", kind=kind)
+        matchups = await get_hero_matchups(
+            client, [player.hero_id for player in raw_match.players]
+        )
+
     await jobs.set_progress(match_id, "正在整理比赛数据", kind=kind)
-    processor = DataProcessor(hero_map, item_map, hero_roles)
+    processor = DataProcessor(hero_map, item_map, hero_roles, matchups)
     analysis = processor.process_match(raw_match, parse_status)
 
     if generate_ai:

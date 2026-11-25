@@ -38,6 +38,8 @@ class ItemAnalysis(BaseModel):
     moonshard: bool
     purchase_timeline: Optional[List[dict]] = None
     has_timeline: bool
+    key_items: List[dict] = []
+    key_item_score: Optional[float] = None
 
 
 class VisionAnalysis(BaseModel):
@@ -63,6 +65,13 @@ class LaningAnalysis(BaseModel):
     creeps_stacked: Optional[int] = None
     actions_per_min: Optional[int] = None
     available: bool
+    opponents: List[str] = []
+    gold_diff_10: Optional[int] = None
+    xp_diff_10: Optional[int] = None
+    lh_diff_10: Optional[int] = None
+    matchup_score: Optional[float] = None
+    lane_score: Optional[float] = None
+    summary: Optional[str] = None
 
 
 class AISuggestions(BaseModel):
@@ -97,6 +106,8 @@ class PlayerAnalysis(BaseModel):
     # Parsed death timing: deaths in a teamfight or just before one.
     key_deaths: int = 0
     teamfight_deaths: int = 0
+    death_timing_available: bool = False
+    buyback_count: int = 0
     parse_status: ParseStatus
     ai_suggestions: Optional[AISuggestions] = None
 
@@ -136,6 +147,21 @@ class MatchVerdict(BaseModel):
     methodology: str = ""
     profile: str = "balanced"
     profile_label: str = ""
+    confidence: float = 0.0
+    confidence_label: str = ""
+    evidence: List[str] = []
+
+
+class MatchEvent(BaseModel):
+    time: int
+    time_str: str
+    type: str
+    type_label: str
+    label: str
+    team: Optional[str] = None
+    player_slot: Optional[int] = None
+    hero_name: Optional[str] = None
+    detail: Optional[str] = None
 
 
 class MatchAnalysis(BaseModel):
@@ -147,4 +173,5 @@ class MatchAnalysis(BaseModel):
     match_summary: Optional[str] = None
     analyzed_at: datetime
     verdict: Optional[MatchVerdict] = None
+    timeline: List[MatchEvent] = []
     cache_version: int = 4

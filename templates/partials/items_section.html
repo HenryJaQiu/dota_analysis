@@ -12,8 +12,29 @@
         <span class="upgrade {% if player.items.aghanims_scepter %}upgrade-active{% endif %}">阿哈利姆神杖</span>
         <span class="upgrade {% if player.items.aghanims_shard %}upgrade-active{% endif %}">阿哈利姆魔晶</span>
         <span class="upgrade {% if player.items.moonshard %}upgrade-active{% endif %}">银月之晶</span>
+        {% if player.buyback_count %}
+        <span class="upgrade">买活 {{ player.buyback_count }} 次</span>
+        {% endif %}
     </div>
 </div>
+
+{% if player.items.key_items %}
+<div class="items-container">
+    <h3>关键装备时间</h3>
+    <div class="key-item-list">
+        {% for item in player.items.key_items %}
+        <span class="key-item-chip">
+            <strong>{{ item.item }}</strong>
+            <span class="key-item-time">{{ item.time_str }}</span>
+            <span class="key-item-target">目标 {{ item.target_minutes }}m</span>
+        </span>
+        {% endfor %}
+    </div>
+    <p class="form-hint">
+        装备时机评分：{{ "%.1f"|format(player.items.key_item_score) }} / 100（仅供参考）
+    </p>
+</div>
+{% endif %}
 
 {% if player.items.has_timeline and player.items.purchase_timeline %}
 <div class="purchase-timeline">

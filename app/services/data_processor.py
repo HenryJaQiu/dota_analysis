@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from app.models.match import RawMatch, RawPlayer, ParseStatus
 from app.models.analysis import (
@@ -11,12 +11,39 @@ from app.models.analysis import (
     LaningAnalysis,
     PlayerAnalysis,
     MatchAnalysis,
+    MatchEvent,
 )
 from app.utils.hero_names import resolve_hero_name
 from app.utils.item_names import resolve_item_name, resolve_rank_name
 from app.services.verdict import build_match_verdict
 
 LANE_NAMES = {1: "优势路", 2: "中路", 3: "劣势路", 4: "野区"}
+
+KEY_ITEM_THRESHOLDS = {
+    "blink": 16,
+    "black_king_bar": 22,
+    "cyclone": 18,
+    "force_staff": 18,
+    "pipe": 20,
+    "crimson_guard": 20,
+    "guardian_greaves": 18,
+    "ultimate_scepter": 30,
+    "aghanims_scepter": 30,
+    "manta": 22,
+    "sheepstick": 30,
+    "refresher": 35,
+    "satanic": 35,
+    "assault": 30,
+    "shivas_guard": 30,
+    "lotus_orb": 20,
+}
+
+OBJECTIVE_TYPE_LABELS = {
+    "CHAT_MESSAGE_ROSHAN_KILL": ("roshan", "肉山"),
+    "CHAT_MESSAGE_MINIBOSS_KILL": ("tormentor", "痛苦魔方"),
+    "CHAT_MESSAGE_FIRSTBLOOD": ("first_blood", "一血"),
+    "CHAT_MESSAGE_AEGIS": ("aegis", "不朽盾"),
+}
 
 
 class DataProcessor:
@@ -25,10 +52,12 @@ class DataProcessor:
         hero_map: Dict[int, str],
         item_map: Dict[int, str],
         hero_roles: Dict[int, List[str]] = None,
+        matchups: Dict[int, Dict[int, float]] = None,
     ):
         self.hero_map = hero_map
         self.item_map = item_map
         self.hero_roles = hero_roles or {}
+        self.matchups = matchups or {}
 
     def process_match(self, raw: RawMatch, parse_status: ParseStatus) -> MatchAnalysis:
         objectives = raw.objectives or []
@@ -37,6 +66,10 @@ class DataProcessor:
             self._process_player(p, raw, parse_status, objectives, teamfights)
             for p in raw.players
         ]
+        if parse_status == ParseStatus.PARSED:
+            self._apply_lane_evaluation(players, raw)
+        timeline = self._build_timeline(raw, players, parse_status)
+
         analysis = MatchAnalysis(
             match_id=raw.match_id,
             duration_minutes=raw.duration / 60.0,
@@ -44,6 +77,7 @@ class DataProcessor:
             parse_status=parse_status,
             players=players,
             analyzed_at=datetime.utcnow(),
+            timeline=timeline,
         )
         if parse_status == ParseStatus.PARSED:
             analysis.verdict = build_match_verdict(analysis)
@@ -64,6 +98,13 @@ class DataProcessor:
         key_deaths, teamfight_deaths = self._death_metrics(
             p.deaths_log, teamfights, is_parsed
         )
+        death_timing_available = bool(
+            is_parsed and p.deaths_log is not None and teamfights
+        )
+        if p.buyback_count is not None:
+            buyback_count = int(p.buyback_count)
+        else:
+            buyback_count = len(p.buyback_log or [])
 
         economy = self._process_economy(p)
         teamfight = self._process_teamfight(p, is_parsed)
@@ -88,6 +129,8 @@ class DataProcessor:
             laning=laning,
             key_deaths=key_deaths,
             teamfight_deaths=teamfight_deaths,
+            death_timing_available=death_timing_available,
+            buyback_count=buyback_count,
             parse_status=parse_status,
         )
 
@@ -135,6 +178,288 @@ class DataProcessor:
         key_deaths = pre_fight + early_fight
         teamfight_deaths = pre_fight + early_fight + during_fight
         return key_deaths, teamfight_deaths
+
+    def _value_at(self, timeline, minute: int) -> Optional[int]:
+        if not timeline:
+            return None
+        try:
+            index = min(max(int(minute), 0), len(timeline) - 1)
+            return int(timeline[index])
+        except (TypeError, ValueError):
+            return None
+
+    def _physical_lane(self, player: RawPlayer) -> Optional[int]:
+        if player.lane in (1, 2, 3):
+            return player.lane
+        radiant = player.player_slot < 128
+        if player.lane_role == 2:
+            return 2
+        if player.lane_role == 1:
+            return 1 if radiant else 3
+        if player.lane_role == 3:
+            return 3 if radiant else 1
+        return None
+
+    def _apply_lane_evaluation(
+        self, players: List[PlayerAnalysis], raw: RawMatch
+    ) -> None:
+        by_slot = {player.player_slot: player for player in players}
+
+        for raw_player in raw.players:
+            target = by_slot.get(raw_player.player_slot)
+            if target is None or not target.laning.available:
+                continue
+            lane = self._physical_lane(raw_player)
+            if lane is None:
+                continue
+
+            is_radiant = raw_player.player_slot < 128
+            opponents = [
+                other
+                for other in raw.players
+                if (other.player_slot < 128) != is_radiant
+                and self._physical_lane(other) == lane
+            ]
+            if not opponents:
+                continue
+
+            target.laning.opponents = [
+                resolve_hero_name(other.hero_id, self.hero_map)
+                for other in opponents
+            ]
+
+            own_gold = self._value_at(raw_player.gold_t, 10)
+            own_xp = self._value_at(raw_player.xp_t, 10)
+            own_lh = self._value_at(raw_player.lh_t, 10)
+            opp_gold = [
+                value for value in (
+                    self._value_at(other.gold_t, 10) for other in opponents
+                ) if value is not None
+            ]
+            opp_xp = [
+                value for value in (
+                    self._value_at(other.xp_t, 10) for other in opponents
+                ) if value is not None
+            ]
+            opp_lh = [
+                value for value in (
+                    self._value_at(other.lh_t, 10) for other in opponents
+                ) if value is not None
+            ]
+
+            if own_gold is not None and opp_gold:
+                target.laning.gold_diff_10 = int(round(own_gold - sum(opp_gold) / len(opp_gold)))
+            if own_xp is not None and opp_xp:
+                target.laning.xp_diff_10 = int(round(own_xp - sum(opp_xp) / len(opp_xp)))
+            if own_lh is not None and opp_lh:
+                target.laning.lh_diff_10 = int(round(own_lh - sum(opp_lh) / len(opp_lh)))
+
+            matchup = self.matchups.get(raw_player.hero_id) or {}
+            rates = [
+                matchup[other.hero_id]
+                for other in opponents
+                if other.hero_id in matchup
+            ]
+            if rates:
+                target.laning.matchup_score = round(sum(rates) / len(rates), 1)
+
+            components = []
+            if target.laning.gold_diff_10 is not None:
+                components.append((
+                    0.5,
+                    max(0.0, min(100.0, 50 + target.laning.gold_diff_10 / 2500 * 50)),
+                ))
+            if target.laning.xp_diff_10 is not None:
+                components.append((
+                    0.3,
+                    max(0.0, min(100.0, 50 + target.laning.xp_diff_10 / 2500 * 50)),
+                ))
+            if target.laning.lh_diff_10 is not None:
+                components.append((
+                    0.2,
+                    max(0.0, min(100.0, 50 + target.laning.lh_diff_10 / 25 * 50)),
+                ))
+
+            if not components:
+                continue
+            total_weight = sum(weight for weight, _score in components)
+            performance = sum(
+                weight * score for weight, score in components
+            ) / total_weight
+
+            if target.laning.matchup_score is not None:
+                lane_score = performance * 0.65 + target.laning.matchup_score * 0.35
+            else:
+                lane_score = performance
+            target.laning.lane_score = round(lane_score, 1)
+
+            summary_parts = []
+            if target.laning.gold_diff_10 is not None:
+                diff = target.laning.gold_diff_10
+                if diff > 400:
+                    summary_parts.append(f"对线经济领先 +{diff}")
+                elif diff < -400:
+                    summary_parts.append(f"对线经济落后 {diff}")
+                else:
+                    summary_parts.append("对线经济基本持平")
+            if target.laning.matchup_score is not None:
+                if target.laning.matchup_score < 45:
+                    summary_parts.append(
+                        f"对位被克制（胜率 {target.laning.matchup_score:.0f}%）"
+                    )
+                elif target.laning.matchup_score > 55:
+                    summary_parts.append(
+                        f"对位有优势（胜率 {target.laning.matchup_score:.0f}%）"
+                    )
+            target.laning.summary = "；".join(summary_parts) or None
+
+    def _team_from_value(self, value) -> Optional[str]:
+        if value == 2:
+            return "天辉"
+        if value == 3:
+            return "夜魇"
+        return None
+
+    def _team_from_slot(self, slot) -> Optional[str]:
+        if slot is None:
+            return None
+        try:
+            slot = int(slot)
+        except (TypeError, ValueError):
+            return None
+        return "天辉" if slot < 128 else "夜魇"
+
+    def _building_label(self, key: str) -> str:
+        key = key or ""
+        side = "天辉" if "goodguys" in key else "夜魇" if "badguys" in key else ""
+        lane = "中路" if "_mid" in key else "上路" if "_top" in key else "下路" if "_bot" in key else ""
+        if "rax" in key:
+            structure = "兵营"
+        elif "tower" in key:
+            structure = "防御塔"
+        else:
+            structure = "建筑"
+        tier = ""
+        for level, label in (("tower1", "一塔"), ("tower2", "二塔"), ("tower3", "三塔"), ("tower4", "四塔")):
+            if level in key:
+                tier = label
+                break
+        return f"{side}{lane}{tier or structure}"
+
+    def _build_timeline(
+        self,
+        raw: RawMatch,
+        players: List[PlayerAnalysis],
+        parse_status: ParseStatus,
+    ) -> List[MatchEvent]:
+        if parse_status != ParseStatus.PARSED:
+            return []
+
+        events: List[MatchEvent] = []
+
+        def add_event(
+            time_value,
+            event_type: str,
+            type_label: str,
+            label: str,
+            team: Optional[str] = None,
+            player_slot: Optional[int] = None,
+            hero_name: Optional[str] = None,
+            detail: Optional[str] = None,
+        ) -> None:
+            try:
+                seconds = int(time_value)
+            except (TypeError, ValueError):
+                return
+            if seconds < 0:
+                return
+            events.append(
+                MatchEvent(
+                    time=seconds,
+                    time_str=self._format_time(seconds),
+                    type=event_type,
+                    type_label=type_label,
+                    label=label,
+                    team=team,
+                    player_slot=player_slot,
+                    hero_name=hero_name,
+                    detail=detail,
+                )
+            )
+
+        for objective in raw.objectives or []:
+            if not isinstance(objective, dict):
+                continue
+            obj_type = objective.get("type", "")
+            time_value = objective.get("time")
+            team_value = self._team_from_value(objective.get("team"))
+            slot_team = self._team_from_slot(objective.get("player_slot"))
+            team = team_value or slot_team
+            player_slot = objective.get("player_slot")
+            hero_name = None
+            if player_slot is not None:
+                try:
+                    raw_player = next(
+                        (p for p in raw.players if p.player_slot == int(player_slot)),
+                        None,
+                    )
+                except (TypeError, ValueError):
+                    raw_player = None
+                if raw_player:
+                    hero_name = resolve_hero_name(raw_player.hero_id, self.hero_map)
+
+            if obj_type in OBJECTIVE_TYPE_LABELS:
+                event_type, label = OBJECTIVE_TYPE_LABELS[obj_type]
+                add_event(
+                    time_value,
+                    event_type,
+                    label,
+                    label,
+                    team=team,
+                    player_slot=player_slot,
+                    hero_name=hero_name,
+                )
+            elif obj_type == "building_kill":
+                add_event(
+                    time_value,
+                    "tower",
+                    "建筑",
+                    self._building_label(objective.get("key", "")),
+                    team=slot_team,
+                    player_slot=player_slot,
+                    hero_name=hero_name,
+                )
+
+        for raw_player in raw.players:
+            hero_name = resolve_hero_name(raw_player.hero_id, self.hero_map)
+            team = self._team_from_slot(raw_player.player_slot)
+            for entry in raw_player.buyback_log or []:
+                if isinstance(entry, dict):
+                    add_event(
+                        entry.get("time"),
+                        "buyback",
+                        "买活",
+                        "买活",
+                        team=team,
+                        player_slot=raw_player.player_slot,
+                        hero_name=hero_name,
+                    )
+
+        for player in players:
+            for item in player.items.key_items:
+                add_event(
+                    item.get("time"),
+                    "item",
+                    "关键装备",
+                    item.get("item", ""),
+                    team=player.team,
+                    player_slot=player.player_slot,
+                    hero_name=player.hero_name,
+                    detail=f"目标 {item.get('target_minutes')} 分钟",
+                )
+
+        events.sort(key=lambda event: (event.time, event.type))
+        return events[:300]
 
     def _process_economy(self, p: RawPlayer) -> EconomyAnalysis:
         bm = p.benchmarks
@@ -219,6 +544,46 @@ class DataProcessor:
                 for entry in p.purchase_log
             ]
 
+        key_items = []
+        seen_items = set()
+        if p.purchase_log:
+            for entry in p.purchase_log:
+                if not isinstance(entry, dict):
+                    continue
+                item_key = entry.get("key", "")
+                threshold = KEY_ITEM_THRESHOLDS.get(item_key)
+                if threshold is None or item_key in seen_items:
+                    continue
+                try:
+                    time_value = int(entry.get("time", 0))
+                except (TypeError, ValueError):
+                    continue
+                if time_value < 0:
+                    continue
+                seen_items.add(item_key)
+                minutes = time_value / 60.0
+                timing_score = max(
+                    0.0,
+                    min(100.0, 100.0 - max(0.0, minutes - threshold) * 8.0),
+                )
+                key_items.append({
+                    "item_key": item_key,
+                    "item": resolve_item_name(item_key, self.item_map),
+                    "time": time_value,
+                    "time_str": self._format_time(time_value),
+                    "target_minutes": threshold,
+                    "score": round(timing_score, 1),
+                })
+        key_items.sort(key=lambda item: item["time"])
+        key_item_score = (
+            round(
+                sum(item["score"] for item in key_items) / len(key_items),
+                1,
+            )
+            if key_items
+            else None
+        )
+
         return ItemAnalysis(
             final_items=final_items,
             aghanims_scepter=bool(p.aghanims_scepter),
@@ -226,6 +591,8 @@ class DataProcessor:
             moonshard=bool(p.moonshard),
             purchase_timeline=purchase_timeline,
             has_timeline=has_timeline,
+            key_items=key_items,
+            key_item_score=key_item_score,
         )
 
     def _process_vision(self, p: RawPlayer, is_parsed: bool) -> VisionAnalysis:
@@ -244,7 +611,7 @@ class DataProcessor:
         if not is_parsed or not objectives:
             return ObjectiveAnalysis(available=False)
 
-        team_slot = 0 if p.player_slot < 128 else 1
+        team_value = 2 if p.player_slot < 128 else 3
         roshan_kills = 0
         tormentor_kills = 0
         wisdom_runes = 0
@@ -256,10 +623,13 @@ class DataProcessor:
             slot = obj.get("player_slot")
 
             if obj_type == "CHAT_MESSAGE_ROSHAN_KILL":
-                if obj_team == team_slot:
+                if obj_team == team_value:
                     roshan_kills += 1
-            elif obj_type == "CHAT_MESSAGE_TORMENTOR_KILL":
-                if obj_team == team_slot:
+            elif obj_type in {
+                "CHAT_MESSAGE_TORMENTOR_KILL",
+                "CHAT_MESSAGE_MINIBOSS_KILL",
+            }:
+                if obj_team == team_value:
                     tormentor_kills += 1
             elif obj_type == "CHAT_MESSAGE_RUNE_PICKUP" and slot == p.player_slot:
                 key = obj.get("key", "")
@@ -281,10 +651,10 @@ class DataProcessor:
             return LaningAnalysis(available=False)
 
         lane_name = None
-        if p.lane is not None:
-            lane_name = LANE_NAMES.get(p.lane)
-        elif p.lane_role is not None:
+        if p.lane_role is not None:
             lane_name = LANE_NAMES.get(p.lane_role)
+        elif p.lane is not None:
+            lane_name = LANE_NAMES.get(p.lane)
 
         if p.is_roaming:
             lane_name = "游走"

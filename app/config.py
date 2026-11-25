@@ -47,6 +47,8 @@ class Settings(BaseSettings):
     # ===== Verdict scoring =====
     verdict_mode: str = "balanced"
     verdict_weights_file: str = "cache/verdict_weights.json"
+    hero_matchup_cache_dir: str = "cache/hero_matchups"
+    hero_matchup_cache_seconds: int = 604800
 
     # ===== Followed players =====
     follows_file: str = "cache/follows.json"

@@ -5,6 +5,7 @@ from app.models.analysis import (
     ItemAnalysis,
     LaningAnalysis,
     MatchAnalysis,
+    MatchEvent,
     ObjectiveAnalysis,
     PlayerAnalysis,
     TeamfightAnalysis,
@@ -52,6 +53,12 @@ def make_player(
     gpm_benchmark: float = 50.0,
     lh_benchmark: float = 50.0,
     damage_benchmark: float = 50.0,
+    lane_score: float = 70.0,
+    matchup_score: float = 50.0,
+    gold_diff_10: int = 0,
+    xp_diff_10: int = 0,
+    lh_diff_10: int = 0,
+    key_item_score: float = 75.0,
 ) -> PlayerAnalysis:
     kda = (kills + assists) / max(deaths, 1)
     return PlayerAnalysis(
@@ -90,6 +97,15 @@ def make_player(
             aghanims_shard=False,
             moonshard=False,
             has_timeline=False,
+            key_items=[{
+                "item_key": "blink",
+                "item": "跳刀",
+                "time": 720,
+                "time_str": "12:00",
+                "target_minutes": 16,
+                "score": key_item_score,
+            }],
+            key_item_score=key_item_score,
         ),
         vision=VisionAnalysis(
             obs_placed=obs,
@@ -110,9 +126,18 @@ def make_player(
             camps_stacked=0,
             actions_per_min=150,
             available=True,
+            opponents=["敌方英雄"],
+            gold_diff_10=gold_diff_10,
+            xp_diff_10=xp_diff_10,
+            lh_diff_10=lh_diff_10,
+            matchup_score=matchup_score,
+            lane_score=lane_score,
+            summary="对线经济基本持平；对位胜率 50%",
         ),
         key_deaths=key_deaths,
         teamfight_deaths=teamfight_deaths,
+        death_timing_available=True,
+        buyback_count=1 if key_deaths else 0,
         parse_status=ParseStatus.PARSED,
     )
 
@@ -195,6 +220,42 @@ def make_match(parse_status: ParseStatus = ParseStatus.PARSED) -> MatchAnalysis:
         parse_status=parse_status,
         players=radiant + dire,
         analyzed_at=datetime.utcnow(),
+        timeline=[
+            MatchEvent(
+                time=300,
+                time_str="5:00",
+                type="roshan",
+                type_label="肉山",
+                label="肉山",
+                team="天辉",
+            ),
+            MatchEvent(
+                time=720,
+                time_str="12:00",
+                type="tower",
+                type_label="建筑",
+                label="夜魇中路一塔",
+                team="天辉",
+            ),
+            MatchEvent(
+                time=900,
+                time_str="15:00",
+                type="buyback",
+                type_label="买活",
+                label="买活",
+                team="夜魇",
+                hero_name="敌法师",
+            ),
+            MatchEvent(
+                time=1000,
+                time_str="16:40",
+                type="item",
+                type_label="关键装备",
+                label="跳刀",
+                team="天辉",
+                hero_name="主宰",
+            ),
+        ] if parse_status == ParseStatus.PARSED else [],
     )
 
 
@@ -252,8 +313,13 @@ def test_verdict_metrics_benchmarks_shares_and_roles():
         "tower_share",
         "kill_share",
         "key_deaths",
+        "lane_evaluation",
+        "item_timing",
     ):
         assert key in keys
+
+    assert verdict.confidence >= 0.85
+    assert verdict.confidence_label == "高"
 
     gpm = next(metric for metric in best.metrics if metric.key == "gpm")
     assert gpm.benchmark_score is not None
@@ -307,6 +373,29 @@ def test_verdict_profiles_and_custom_weights(tmp_path, monkeypatch):
         if metric.key == "gpm"
     )
     assert custom_gpm > baseline_gpm
+
+
+def test_confidence_reports_insufficient_evidence():
+    match = make_match()
+    for player in match.players:
+        player.hero_roles = []
+        player.laning.lane_score = None
+        player.laning.matchup_score = None
+        player.death_timing_available = False
+        player.key_deaths = 0
+        player.teamfight_deaths = 0
+        player.items.key_items = []
+        player.items.key_item_score = None
+        player.economy.gpm_benchmark_pct = None
+        player.economy.lh_benchmark_pct = None
+        player.teamfight.hero_damage_benchmark_pct = None
+    match.timeline = []
+
+    verdict = build_match_verdict(match)
+    assert verdict is not None
+    assert verdict.confidence < 0.45
+    assert verdict.confidence_label == "证据不足"
+    assert verdict.evidence
 
 
 def test_death_timing_metrics():

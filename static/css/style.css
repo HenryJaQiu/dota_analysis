@@ -815,6 +815,158 @@ body {
     line-height: 1.5;
 }
 
+.verdict-confidence-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+}
+
+.confidence-pill {
+    font-size: 0.72rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 3px 10px;
+    color: var(--text-secondary);
+}
+
+.confidence-high {
+    color: var(--radiant);
+    border-color: rgba(74, 222, 128, 0.4);
+    background: rgba(74, 222, 128, 0.08);
+}
+
+.confidence-medium {
+    color: var(--accent);
+    border-color: rgba(88, 166, 255, 0.4);
+    background: rgba(88, 166, 255, 0.08);
+}
+
+.confidence-low {
+    color: var(--priority);
+    border-color: rgba(251, 191, 36, 0.4);
+    background: rgba(251, 191, 36, 0.08);
+}
+
+.confidence-insufficient {
+    color: var(--dire);
+    border-color: rgba(248, 113, 113, 0.45);
+    background: rgba(248, 113, 113, 0.08);
+}
+
+.confidence-details {
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+}
+
+.confidence-details summary {
+    cursor: pointer;
+    color: var(--accent);
+}
+
+.confidence-details ul {
+    margin: 6px 0 0 16px;
+    line-height: 1.6;
+}
+
+.verdict-evidence-warning {
+    margin-bottom: 14px;
+    padding: 10px 12px;
+    border: 1px solid rgba(248, 113, 113, 0.4);
+    border-radius: 8px;
+    background: rgba(248, 113, 113, 0.08);
+    color: var(--dire);
+    font-size: 0.82rem;
+    line-height: 1.6;
+}
+
+/* ===== Match timeline ===== */
+.timeline-section {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 24px;
+    scroll-margin-top: 70px;
+}
+
+.timeline-section summary {
+    cursor: pointer;
+    color: var(--gold);
+    font-size: 0.95rem;
+    font-weight: 600;
+    user-select: none;
+}
+
+.timeline-list {
+    max-height: 420px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-top: 12px;
+}
+
+.timeline-event {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.8rem;
+}
+
+.timeline-event:last-child { border-bottom: none; }
+
+.timeline-time {
+    min-width: 44px;
+    color: var(--accent);
+    font-family: monospace;
+}
+
+.timeline-badge {
+    font-size: 0.66rem;
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 1px 7px;
+    background: var(--bg-card2);
+}
+
+.timeline-roshan .timeline-badge {
+    color: var(--gold);
+    border-color: rgba(246, 201, 14, 0.35);
+}
+
+.timeline-tower .timeline-badge {
+    color: var(--priority);
+    border-color: rgba(251, 191, 36, 0.35);
+}
+
+.timeline-buyback .timeline-badge {
+    color: var(--dire);
+    border-color: rgba(248, 113, 113, 0.35);
+}
+
+.timeline-item .timeline-badge {
+    color: var(--accent);
+    border-color: rgba(88, 166, 255, 0.35);
+}
+
+.timeline-label { color: var(--text-primary); }
+.timeline-hero { color: var(--text-secondary); }
+.timeline-detail { color: var(--text-secondary); font-size: 0.68rem; }
+
+.timeline-team {
+    margin-left: auto;
+    font-size: 0.7rem;
+}
+
+.radiant-text { color: var(--radiant); }
+.dire-text { color: var(--dire); }
+
 .verdict-ranking {
     list-style: none;
     margin-top: 8px;
@@ -1286,6 +1438,49 @@ body {
     font-size: 0.8rem;
     line-height: 1;
 }
+
+/* ===== Lane evaluation & key items ===== */
+.lane-evaluation {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.lane-evaluation h3 {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin-bottom: 10px;
+}
+
+.lane-opponents {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    margin-top: 8px;
+}
+
+.key-item-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.key-item-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    background: var(--bg-card2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 0.8rem;
+}
+
+.key-item-chip strong { color: var(--text-primary); }
+.key-item-time { color: var(--gold); font-family: monospace; }
+.key-item-target { color: var(--text-secondary); font-size: 0.68rem; }
 
 /* ===== No Data ===== */
 .no-data-section {

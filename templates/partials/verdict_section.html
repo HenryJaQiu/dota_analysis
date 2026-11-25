@@ -24,6 +24,32 @@
         </span>
     </div>
 
+    {% set conf = analysis.verdict.confidence %}
+    <div class="verdict-confidence-row">
+        <span class="confidence-pill
+            {% if conf >= 0.85 %}confidence-high
+            {% elif conf >= 0.65 %}confidence-medium
+            {% elif conf >= 0.45 %}confidence-low
+            {% else %}confidence-insufficient{% endif %}">
+            置信度：{{ analysis.verdict.confidence_label or "未知" }} · {{ (conf * 100)|round|int }}%
+        </span>
+        {% if analysis.verdict.evidence %}
+        <details class="confidence-details">
+            <summary>证据说明</summary>
+            <ul>
+                {% for note in analysis.verdict.evidence %}
+                <li>{{ note }}</li>
+                {% endfor %}
+            </ul>
+        </details>
+        {% endif %}
+    </div>
+    {% if conf < 0.45 %}
+    <div class="verdict-evidence-warning">
+        证据不足：关键数据覆盖不够，分锅结果仅作参考。建议重新解析录像后再看。
+    </div>
+    {% endif %}
+
     <div class="verdict-grid">
         <article class="verdict-card verdict-blame">
             <div class="verdict-kicker">败方最大责任 · {{ analysis.verdict.loser_team }}</div>

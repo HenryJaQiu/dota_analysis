@@ -29,6 +29,10 @@
 
 ![评分明细](docs/screenshots/verdict.png)
 
+### 比赛时间轴
+
+![比赛时间轴](docs/screenshots/timeline.png)
+
 ### 关注玩家
 
 ![关注玩家](docs/screenshots/follows.png)
@@ -43,6 +47,9 @@
 - 经济曲线可视化（所有人 / 阵营对比 / 当前玩家）
 - AI 中文复盘建议，按玩家生成，包含模型标识与生成时间
 - **解析后分锅分析**：败方最大责任、胜方最佳玩家、五人排名、英雄基准、队内占比、关键死亡与评分明细
+- **对线评价**：lane_role、对线对手、10 分钟经济/经验/补刀差，以及英雄对位胜率修正
+- **比赛时间轴**：肉山、防御塔、买活、关键装备时间点
+- **分锅置信度**：高 / 中 / 低 / 证据不足，并列出缺失的数据来源
 - **三种评分模式**：均衡评估 / 严格分锅 / 温和复盘，权重可自定义
 - **Steam 好友关注**：输入好友代码 / SteamID64 / 个人主页，自动获取最近比赛 ID 并快速分析
 - **本地永久存档**：分析结果、原始 OpenDota 数据和录像解析字段都保存在本地，后续可直接复查
@@ -135,14 +142,45 @@ python main.py
 1. **同英雄基准**：GPM、补刀、英雄伤害会与 OpenDota 同英雄基准百分位各按 50% 混合，减少“不同英雄天生伤害/经济不同”的偏差。
 2. **英雄定位**：优先使用 OpenDota 的英雄角色数据（Carry / Support 等），再结合经济与补刀判断核心 / 辅助；不是只看钱。
 3. **队内占比**：经济占比、伤害占比、推塔占比、参团击杀占比。
-4. **死亡时间**：除了死亡总数，还会统计「关键死亡」：
+4. **对线评价**：
+   - 使用 `lane_role` + 物理分路匹配对线对手
+   - 对比 10 分钟经济、经验、补刀差
+   - 拉取 OpenDota 同英雄对位胜率，按 65% 对线表现 + 35% 对位胜率修正
+   - 页面显示对线对手、10 分钟差和对位英雄胜率
+5. **死亡时间**：除了死亡总数，还会统计「关键死亡」：
    - 团战开始前 10 秒内死亡
    - 团战开始后 10 秒内死亡
    这些死亡会视为更关键的减员，权重更高。
-5. **常规维度**：KDA、XPM、净身价、参团率、视野贡献、治疗量、目标参与。
-6. **位置权重**：核心更看经济/伤害/KDA，辅助更看参团/视野/治疗/目标。
+6. **装备与目标时间轴**：
+   - 关键装备购买时间（跳刀、BKB、紫怨、笛子、大祭品等）与时机评分
+   - 买活次数和买活时间点
+   - 肉山、痛苦魔方、防御塔/兵营、一血、不朽盾
+   - 统一展示在比赛详情页可展开的「比赛时间轴」
+7. **常规维度**：KDA、XPM、净身价、参团率、视野贡献、治疗量、目标参与。
+8. **位置权重**：核心更看经济/伤害/KDA，辅助更看参团/视野/治疗/目标。
 
 评分是**同队内相对分数**，越高代表本场贡献越大。每个指标的得分、归一化权重和贡献会显示在「评分明细」表格里。
+
+### 置信度与证据不足
+
+分锅结果现在带置信度，显示在模式切换下方：
+
+- **高**：关键数据覆盖充分
+- **中**：缺少少量数据
+- **低**：多项数据缺失
+- **证据不足**：置信度低于 45%，页面会明确提示“证据不足”，并列出缺失的数据来源
+
+置信度由这些数据的覆盖率计算：英雄定位、同英雄基准、对线数据、英雄对位胜率、死亡时间/团战窗口、视野、参团率、关键装备时间、比赛时间轴。
+
+常见缺失原因：
+
+- 旧缓存没有新字段（重新解析后补齐）
+- 录像解析不完整，没有 `lane` / `gold_t` / `lh_t` / `deaths_log`
+- OpenDota 对位接口失败
+- 玩家没有购买预设的关键装备
+- 比赛没有可用时间轴事件
+
+> 即使显示“证据不足”，页面仍会给出评分，但会明确标注可靠度，不会把缺失数据当成 0 分。
 
 ### 三种模式
 
@@ -181,9 +219,9 @@ VERDICT_MODE=balanced
 
 - 也可以写成扁平形式，同时作用于核心和辅助
 - `cache/verdict_weights.json` 已被 Git 忽略
-- 指标 key 包括：`gpm`、`xpm`、`last_hits`、`net_worth`、`economy_share`、`hero_damage`、`damage_share`、`tower_damage`、`tower_share`、`kda`、`deaths`、`key_deaths`、`participation`、`kill_share`、`vision`、`healing`、`objectives`
+- 指标 key 包括：`gpm`、`xpm`、`last_hits`、`net_worth`、`economy_share`、`hero_damage`、`damage_share`、`tower_damage`、`tower_share`、`kda`、`deaths`、`key_deaths`、`teamfight_deaths`、`participation`、`kill_share`、`vision`、`healing`、`objectives`、`lane_evaluation`、`item_timing`
 
-> 分锅结果是数据模型评估，不代表唯一结论。位置由英雄定位 + 经济/补刀推断；死亡时间基于 OpenDota 的 `deaths_log` 与团战窗口近似；没有纳入对线对手、英雄克制、指挥和空间创造等无法量化的因素。
+> 分锅结果是数据模型评估，不代表唯一结论。位置由英雄定位 + 经济/补刀推断；死亡时间基于 OpenDota 的 `deaths_log` 与团战窗口近似；对线依赖 10 分钟时间线和 OpenDota 对位胜率；关键装备阈值是通用参考（跳刀 16 分钟、BKB 22 分钟等），不同英雄/位置会有差异，因此只占较小权重；买活主要作为时间轴展示，不直接打分。没有纳入具体技能释放质量、对线消耗细节、队伍指挥和空间创造等无法量化的因素。
 
 ## 关注玩家
 
@@ -263,6 +301,8 @@ OpenCode Go 同时提供两种协议：
 | `PARSE_MAX_ATTEMPTS` | 后台最多检查次数 | `30` |
 | `VERDICT_MODE` | 默认分锅模式：`balanced` / `strict` / `gentle` | `balanced` |
 | `VERDICT_WEIGHTS_FILE` | 自定义权重倍率文件 | `cache/verdict_weights.json` |
+| `HERO_MATCHUP_CACHE_DIR` | 英雄对位胜率缓存目录 | `cache/hero_matchups` |
+| `HERO_MATCHUP_CACHE_SECONDS` | 英雄对位缓存有效期（秒） | `604800` |
 | `FOLLOWS_FILE` | 关注列表与最近比赛存档 | `cache/follows.json` |
 | `FOLLOWS_REFRESH_SECONDS` | 关注玩家最近比赛的自动刷新间隔（秒） | `300` |
 | `FOLLOWS_MAX` | 最多关注人数 | `20` |
@@ -305,6 +345,7 @@ MINIMAX_MODEL=MiniMax-M2.7
 | 结构化分析存档 | `cache/matches/*.json` | 否 |
 | 原始 OpenDota 数据（含录像解析字段） | `cache/raw/*.json` | 否 |
 | 关注玩家与最近比赛缓存 | `cache/follows.json` | 否 |
+| 英雄对位胜率缓存 | `cache/hero_matchups/*.json` | 否 |
 | 环境变量模板 | `.env.example` | 是（仅占位符） |
 
 API Key 只会写入本机 `cache/llm_settings.json`。`.gitignore` 已显式忽略：
@@ -405,6 +446,7 @@ git ls-files | Select-String -Pattern "llm_settings.json|^cache/|(^|/)\.env$"
 │   │   ├── opendota.py           # OpenDota 客户端
 │   │   ├── data_processor.py     # 数据清洗与结构化
 │   │   ├── verdict.py            # 分锅评分：败方责任 / 胜方最佳
+│   │   ├── hero_matchups.py      # 英雄对位胜率缓存
 │   │   ├── follows.py            # Steam ID 解析、关注列表与最近比赛
 │   │   ├── ai_analyzer.py        # 提示词、JSON 解析、AI 建议
 │   │   ├── llm_client.py         # OpenAI / Anthropic 双协议传输
@@ -524,6 +566,8 @@ git push -u origin main
 - OpenDota 对未解析录像需要等待，页面会先展示基础数据并在后台自动升级
 - 分锅分析依赖录像解析数据，基础数据阶段不会生成
 - 分锅评分会在打开详情页时按当前模式和自定义权重重新计算；旧缓存会自动补齐评分明细
+- 分锅置信度低于 45% 时会标记为“证据不足”，并列出缺失的数据来源
+- 英雄对位胜率缓存在 `cache/hero_matchups/`，默认 7 天；删除不影响分析，只会重新拉取
 - 关注列表与最近比赛缓存在 `cache/follows.json`，默认 5 分钟自动刷新
 - Steam 隐私设置会限制 OpenDota 能获取到的最近比赛
 - 进程内任务管理适合单机使用；多实例部署需要换成 Redis / 队列
