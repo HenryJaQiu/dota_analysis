@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from typing import Awaitable, Callable, Dict, Optional
+from typing import Any, Awaitable, Callable, Dict, Optional
 
 import httpx
 
@@ -36,7 +36,7 @@ class OpenDotaClient:
     async def close(self):
         await self._client.aclose()
 
-    async def _get(self, path: str, max_retries: int = 3) -> dict:
+    async def _get(self, path: str, max_retries: int = 3) -> Any:
         for attempt in range(max_retries):
             await self._rate_limiter.acquire()
             try:
@@ -121,6 +121,23 @@ class OpenDotaClient:
             if item_id is not None:
                 result[item_id] = key
         return result
+
+    async def fetch_player(self, account_id: int) -> dict:
+        data = await self._get(f"/players/{int(account_id)}")
+        if not isinstance(data, dict):
+            raise OpenDotaAPIError("玩家数据格式无法识别")
+        return data
+
+    async def fetch_player_matches(
+        self, account_id: int, limit: int = 8
+    ) -> list:
+        limit = max(1, min(int(limit), 50))
+        data = await self._get(
+            f"/players/{int(account_id)}/matches?limit={limit}"
+        )
+        if not isinstance(data, list):
+            return []
+        return data
 
 
 _client: Optional[OpenDotaClient] = None

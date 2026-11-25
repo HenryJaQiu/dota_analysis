@@ -46,6 +46,33 @@
     </div>
 </div>
 
+<section class="follow-section" id="follow-section">
+    <div class="follow-head">
+        <div>
+            <h2>关注玩家</h2>
+            <p>输入 Steam 好友 ID 或 SteamID64，自动获取最近比赛，点击比赛即可快速分析。</p>
+        </div>
+        <button type="button" class="btn-secondary" id="follow-refresh-btn">刷新全部</button>
+    </div>
+
+    <form class="follow-form" id="follow-form">
+        <input type="text" id="follow-input" class="form-input"
+               placeholder="Steam 好友 ID / SteamID64 / 个人主页链接"
+               autocomplete="off" spellcheck="false">
+        <input type="text" id="follow-nickname" class="form-input"
+               placeholder="备注（可选）" maxlength="32" autocomplete="off">
+        <button type="submit" class="btn-primary" id="follow-submit">关注</button>
+    </form>
+    <p class="form-hint">
+        支持 Steam 客户端显示的好友代码、<code>7656119...</code> 开头的 SteamID64、Steam 个人主页链接。
+    </p>
+
+    <div class="follow-status" id="follow-status" role="status"></div>
+    <div class="follow-list" id="follow-list">
+        <div class="follow-empty">正在加载关注列表…</div>
+    </div>
+</section>
+
 {% if recent %}
 <div class="recent-section">
     <h2>最近分析记录</h2>
@@ -68,4 +95,7 @@
     </ul>
 </div>
 {% endif %}
+{% endblock %}
+{% block scripts %}
+<script src="/static/js/follows.js?v=20261125i"></script>
 {% endblock %}

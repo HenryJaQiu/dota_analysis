@@ -7,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
 from app.routers.analysis import router, templates
+from app.routers.follows import router as follows_router
 from app.routers.llm import router as llm_router
 
 app = FastAPI(title="Dota 2 Match Analyzer", version="2.0.0")
@@ -26,6 +27,7 @@ templates.env.filters["tojson"] = lambda obj: json.dumps(
 app.mount("/static", StaticFiles(directory="static"), name="static")
 app.include_router(router)
 app.include_router(llm_router)
+app.include_router(follows_router)
 
 
 if __name__ == "__main__":

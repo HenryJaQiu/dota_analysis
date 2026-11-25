@@ -25,6 +25,10 @@
 
 ![比赛详情](docs/screenshots/match.png)
 
+### 关注玩家
+
+![关注玩家](docs/screenshots/follows.png)
+
 ## 功能特性
 
 - 比赛 ID 输入，后台异步分析并实时展示进度
@@ -35,6 +39,7 @@
 - 经济曲线可视化（所有人 / 阵营对比 / 当前玩家）
 - AI 中文复盘建议，按玩家生成，包含模型标识与生成时间
 - **解析后分锅分析**：败方最大责任、胜方最佳玩家、五人排名与数据理由
+- **Steam 好友关注**：输入好友代码 / SteamID64 / 个人主页，自动获取最近比赛 ID 并快速分析
 - **本地永久存档**：分析结果、原始 OpenDota 数据和录像解析字段都保存在本地，后续可直接复查
 - 多模型 GUI：来源预设、Base URL、API Key、模型列表、连接测试、超时与并发设置
 - 已有比赛可用新模型重新生成 AI 建议，不影响已抓取的比赛数据
@@ -124,6 +129,35 @@ python main.py
 
 > 分锅结果是数据模型评估，不代表唯一结论；位置根据经济与补刀推断，极端阵容可能判断不准。
 
+## 关注玩家
+
+首页可以关注 Steam 好友，自动获取他们的最近 Dota 2 比赛 ID：
+
+1. 在「关注玩家」输入框填写好友信息
+2. 点击「关注」，程序会解析 Steam ID 并拉取最近 8 场比赛
+3. 每场比赛显示英雄、胜负、KDA、时长、比赛 ID 和发生时间
+4. 点击比赛即可直接进入分析：本地有存档就打开存档，没有就开始分析
+5. 打开首页时会自动刷新超过 5 分钟的缓存；也可以点「刷新全部」
+
+支持的输入格式：
+
+| 格式 | 示例 |
+| --- | --- |
+| Steam 好友代码 / Dota 账号 ID | `123456789` |
+| SteamID64 | `76561198000000001` |
+| Steam 个人主页 | `https://steamcommunity.com/profiles/76561198000000001` |
+| Steam 自定义主页 | `https://steamcommunity.com/id/yourname` |
+| Steam2 / Steam3 | `STEAM_0:1:12345678`、`[U:1:123456789]` |
+
+说明：
+
+- Steam 客户端「好友」列表里显示的好友代码就是 Dota 2 账号 ID
+- 自定义主页需要能公开访问；可在 `.env` 配置 `STEAM_API_KEY` 提高解析成功率
+- 最多关注 20 人，每人显示最近 8 场，可在 `.env` 调整
+- 关注列表、最近比赛和头像缓存保存在 `cache/follows.json`，已被 Git 忽略
+- 如果对方隐藏了比赛记录，OpenDota 无法获取，会显示刷新失败原因
+- 刚结束的比赛可能需要几分钟才会出现在 OpenDota 的最近比赛里
+
 ## 支持的模型来源
 
 | 来源 | Base URL | 默认模型 | 鉴权 |
@@ -171,6 +205,11 @@ OpenCode Go 同时提供两种协议：
 | `RAW_CACHE_DIR` | 原始 OpenDota 数据（含解析字段）存档目录 | `cache/raw` |
 | `PARSE_POLL_INTERVAL` | 后台检查录像解析的间隔（秒） | `10` |
 | `PARSE_MAX_ATTEMPTS` | 后台最多检查次数 | `30` |
+| `FOLLOWS_FILE` | 关注列表与最近比赛存档 | `cache/follows.json` |
+| `FOLLOWS_REFRESH_SECONDS` | 关注玩家最近比赛的自动刷新间隔（秒） | `300` |
+| `FOLLOWS_MAX` | 最多关注人数 | `20` |
+| `FOLLOWS_MATCH_LIMIT` | 每位玩家展示的最近比赛数 | `8` |
+| `STEAM_API_KEY` | 可选，用于解析 Steam 自定义主页 | 空 |
 
 > 默认会保留所有分析过的比赛，方便后续复查。只有把 `CACHE_TTL_SECONDS` 设为大于 0 时才会按时间过期。
 >
@@ -207,6 +246,7 @@ MINIMAX_MODEL=MiniMax-M2.7
 | 可选的环境变量默认值 | `.env` | 否 |
 | 结构化分析存档 | `cache/matches/*.json` | 否 |
 | 原始 OpenDota 数据（含录像解析字段） | `cache/raw/*.json` | 否 |
+| 关注玩家与最近比赛缓存 | `cache/follows.json` | 否 |
 | 环境变量模板 | `.env.example` | 是（仅占位符） |
 
 API Key 只会写入本机 `cache/llm_settings.json`。`.gitignore` 已显式忽略：
@@ -275,6 +315,10 @@ git ls-files | Select-String -Pattern "llm_settings.json|^cache/|(^|/)\.env$"
 | GET | `/api/match/{match_id}/parse` | 查询后台录像解析状态 |
 | POST | `/api/match/{match_id}/parse` | 重新提交录像解析检查 |
 | POST | `/api/match/{match_id}/reanalyze` | 用当前模型重新生成 AI 建议 |
+| GET | `/api/follows` | 获取关注列表与最近比赛缓存 |
+| POST | `/api/follows` | 关注玩家（Steam 好友 ID / SteamID64 / 主页） |
+| DELETE | `/api/follows/{account_id}` | 取消关注 |
+| POST | `/api/follows/refresh` | 刷新关注玩家的最近比赛 |
 | GET | `/api/match/{match_id}/reanalyze` | 查询重新生成任务状态 |
 
 ## 项目结构
@@ -294,6 +338,7 @@ git ls-files | Select-String -Pattern "llm_settings.json|^cache/|(^|/)\.env$"
 │   ├── config.py                 # 环境变量与默认配置
 │   ├── routers/
 │   │   ├── analysis.py           # 比赛分析、进度、重新生成建议
+│   │   ├── follows.py            # 关注玩家、最近比赛
 │   │   └── llm.py                # 模型设置、模型列表、连接测试
 │   ├── models/
 │   │   ├── match.py              # OpenDota 原始数据模型
@@ -302,6 +347,7 @@ git ls-files | Select-String -Pattern "llm_settings.json|^cache/|(^|/)\.env$"
 │   │   ├── opendota.py           # OpenDota 客户端
 │   │   ├── data_processor.py     # 数据清洗与结构化
 │   │   ├── verdict.py            # 分锅评分：败方责任 / 胜方最佳
+│   │   ├── follows.py            # Steam ID 解析、关注列表与最近比赛
 │   │   ├── ai_analyzer.py        # 提示词、JSON 解析、AI 建议
 │   │   ├── llm_client.py         # OpenAI / Anthropic 双协议传输
 │   │   ├── llm_settings.py       # 模型配置持久化与预设
@@ -311,7 +357,8 @@ git ls-files | Select-String -Pattern "llm_settings.json|^cache/|(^|/)\.env$"
 │
 ├── templates/                    # 页面与模型设置弹窗
 ├── static/js/settings.js         # 模型设置 GUI
-├── tests/                        # 解析、分锅与配置单元测试
+├── static/js/follows.js          # 关注玩家 GUI
+├── tests/                        # 解析、分锅、关注与配置单元测试
 └── docs/screenshots/             # README 截图
 ```
 
@@ -417,6 +464,8 @@ git push -u origin main
 - 删除 `cache/` 会同时删除已保存的 API Key 配置
 - OpenDota 对未解析录像需要等待，页面会先展示基础数据并在后台自动升级
 - 分锅分析依赖录像解析数据，基础数据阶段不会生成
+- 关注列表与最近比赛缓存在 `cache/follows.json`，默认 5 分钟自动刷新
+- Steam 隐私设置会限制 OpenDota 能获取到的最近比赛
 - 进程内任务管理适合单机使用；多实例部署需要换成 Redis / 队列
 - 模型返回非 JSON 内容时，会降级为原始文本展示并在页面提示
 

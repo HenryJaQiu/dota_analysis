@@ -44,5 +44,13 @@ class Settings(BaseSettings):
     parse_poll_interval: int = 10
     parse_max_attempts: int = 30
 
+    # ===== Followed players =====
+    follows_file: str = "cache/follows.json"
+    follows_refresh_seconds: int = 300
+    follows_max: int = 20
+    follows_match_limit: int = 8
+    # Optional: used to resolve Steam vanity profile URLs.
+    steam_api_key: str = ""
+
 
 settings = Settings()
