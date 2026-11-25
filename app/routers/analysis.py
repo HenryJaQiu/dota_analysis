@@ -17,6 +17,9 @@ from app.services.analysis_jobs import (
 from app.services.cache import get_cache
 from app.services.data_processor import DataProcessor
 from app.services.hero_matchups import get_hero_matchups
+from app.services.item_timings import get_item_timings
+from app.services.lane_matchups import get_lane_matchups
+from app.services.lane_utils import build_lane_pairs
 from app.services.llm_settings import get_llm_config, public_settings
 from app.services.opendota import MatchNotFoundError, OpenDotaAPIError, get_client
 from app.services.verdict import PROFILE_LABELS, build_match_verdict, resolve_profile
@@ -318,14 +321,31 @@ async def _process_match(
     hero_map, item_map, hero_roles = await _load_maps(client)
 
     matchups = {}
+    lane_matchups = {}
+    item_timings = {}
     if parse_status == ParseStatus.PARSED:
-        await jobs.set_progress(match_id, "正在获取英雄对位数据", kind=kind)
-        matchups = await get_hero_matchups(
-            client, [player.hero_id for player in raw_match.players]
+        await jobs.set_progress(
+            match_id,
+            "正在获取英雄对位、分路对位与装备时机数据",
+            kind=kind,
+        )
+        hero_ids = [player.hero_id for player in raw_match.players]
+        matchup_task = get_hero_matchups(client, hero_ids)
+        lane_task = get_lane_matchups(build_lane_pairs(raw_match.players))
+        item_task = get_item_timings()
+        matchups, lane_matchups, item_timings = await asyncio.gather(
+            matchup_task, lane_task, item_task
         )
 
     await jobs.set_progress(match_id, "正在整理比赛数据", kind=kind)
-    processor = DataProcessor(hero_map, item_map, hero_roles, matchups)
+    processor = DataProcessor(
+        hero_map,
+        item_map,
+        hero_roles,
+        matchups,
+        lane_matchups,
+        item_timings,
+    )
     analysis = processor.process_match(raw_match, parse_status)
 
     if generate_ai:

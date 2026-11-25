@@ -145,19 +145,26 @@ python main.py
 4. **对线评价**：
    - 使用 `lane_role` + 物理分路匹配对线对手
    - 对比 10 分钟经济、经验、补刀差
-   - 拉取 OpenDota 同英雄对位胜率，按 65% 对线表现 + 35% 对位胜率修正
-   - 页面显示对线对手、10 分钟差和对位英雄胜率
+   - 通过 OpenDota Explorer 聚合「英雄 A vs 英雄 B + 分路角色」的对位胜率
+   - 分路对位样本不足时，回退到英雄总体对位胜率
+   - 页面显示对线对手、10 分钟差、对位胜率和样本场次
 5. **死亡时间**：除了死亡总数，还会统计「关键死亡」：
    - 团战开始前 10 秒内死亡
    - 团战开始后 10 秒内死亡
    这些死亡会视为更关键的减员，权重更高。
-6. **装备与目标时间轴**：
-   - 关键装备购买时间（跳刀、BKB、紫怨、笛子、大祭品等）与时机评分
+6. **团战结果**：使用 OpenDota `teamfights` 中每名玩家的：
+   - 团战经济差
+   - 团战伤害
+   - 团战死亡
+   作为独立的团战贡献指标；治疗量仍保留在常规维度中。
+7. **装备与目标时间轴**：
+   - 关键装备购买时间（跳刀、BKB、紫怨、笛子、大祭品等）
+   - 装备时机优先使用 `scenarios/itemTimings` 的同英雄购买时间分布；样本不足时回退到通用阈值
    - 买活次数和买活时间点
    - 肉山、痛苦魔方、防御塔/兵营、一血、不朽盾
    - 统一展示在比赛详情页可展开的「比赛时间轴」
-7. **常规维度**：KDA、XPM、净身价、参团率、视野贡献、治疗量、目标参与。
-8. **位置权重**：核心更看经济/伤害/KDA，辅助更看参团/视野/治疗/目标。
+8. **常规维度**：KDA、XPM、净身价、参团率、视野贡献、治疗量、目标参与。
+9. **位置权重**：核心更看经济/伤害/KDA，辅助更看参团/视野/治疗/目标。
 
 评分是**同队内相对分数**，越高代表本场贡献越大。每个指标的得分、归一化权重和贡献会显示在「评分明细」表格里。
 
@@ -170,7 +177,7 @@ python main.py
 - **低**：多项数据缺失
 - **证据不足**：置信度低于 45%，页面会明确提示“证据不足”，并列出缺失的数据来源
 
-置信度由这些数据的覆盖率计算：英雄定位、同英雄基准、对线数据、英雄对位胜率、死亡时间/团战窗口、视野、参团率、关键装备时间、比赛时间轴。
+置信度由这些数据的覆盖率计算：英雄定位、同英雄基准、对线数据、英雄对位胜率、死亡时间/团战窗口、团战经济/伤害、视野、参团率、关键装备时间、比赛时间轴。
 
 > 置信度衡量的是**数据覆盖程度**，不是模型判断的准确率；高置信度只代表较少关键数据缺失。
 
@@ -221,9 +228,9 @@ VERDICT_MODE=balanced
 
 - 也可以写成扁平形式，同时作用于核心和辅助
 - `cache/verdict_weights.json` 已被 Git 忽略
-- 指标 key 包括：`gpm`、`xpm`、`last_hits`、`net_worth`、`economy_share`、`hero_damage`、`damage_share`、`tower_damage`、`tower_share`、`kda`、`deaths`、`key_deaths`、`teamfight_deaths`、`participation`、`kill_share`、`vision`、`healing`、`objectives`、`lane_evaluation`、`item_timing`
+- 指标 key 包括：`gpm`、`xpm`、`last_hits`、`net_worth`、`economy_share`、`hero_damage`、`damage_share`、`tower_damage`、`tower_share`、`kda`、`deaths`、`key_deaths`、`teamfight_deaths`、`teamfight_gold_delta`、`teamfight_damage_share`、`participation`、`kill_share`、`vision`、`healing`、`objectives`、`lane_evaluation`、`item_timing`
 
-> 分锅结果是数据模型评估，不代表唯一结论。位置由英雄定位 + 经济/补刀推断；死亡时间基于 OpenDota 的 `deaths_log` 与团战窗口近似；对线依赖 10 分钟时间线和 OpenDota 对位胜率；关键装备阈值是通用参考（跳刀 16 分钟、BKB 22 分钟等），不同英雄/位置会有差异，因此只占较小权重；买活主要作为时间轴展示，不直接打分。没有纳入具体技能释放质量、对线消耗细节、队伍指挥和空间创造等无法量化的因素。
+> 分锅结果是数据模型评估，不代表唯一结论。位置由英雄定位 + 经济/补刀推断；死亡时间基于 OpenDota 的 `deaths_log` 与团战窗口近似；对线依赖 10 分钟时间线、分路对位样本和英雄总体对位胜率，Explorer 聚合为全分段样本，样本不足会回退；装备时机优先使用 `scenarios/itemTimings` 的同英雄样本，样本不足回退通用阈值；团战贡献来自 `teamfights` 的经济/伤害/治疗数据。买活主要作为时间轴展示，不直接打分。没有纳入具体技能释放质量、对线消耗细节、队伍指挥和空间创造等无法量化的因素。
 
 ## 关注玩家
 
@@ -305,6 +312,12 @@ OpenCode Go 同时提供两种协议：
 | `VERDICT_WEIGHTS_FILE` | 自定义权重倍率文件 | `cache/verdict_weights.json` |
 | `HERO_MATCHUP_CACHE_DIR` | 英雄对位胜率缓存目录 | `cache/hero_matchups` |
 | `HERO_MATCHUP_CACHE_SECONDS` | 英雄对位缓存有效期（秒） | `604800` |
+| `LANE_MATCHUP_CACHE_FILE` | 分路对位组合缓存 | `cache/lane_matchups.json` |
+| `LANE_MATCHUP_CACHE_SECONDS` | 分路对位缓存有效期（秒） | `604800` |
+| `LANE_MATCHUP_MIN_GAMES` | 使用分路对位数据的最少样本场次 | `10` |
+| `ITEM_TIMING_CACHE_FILE` | 英雄装备时机分布缓存 | `cache/item_timings.json` |
+| `ITEM_TIMING_CACHE_SECONDS` | 装备时机缓存有效期（秒） | `604800` |
+| `ITEM_TIMING_MIN_GAMES` | 使用英雄装备时机基准的最少样本 | `8` |
 | `FOLLOWS_FILE` | 关注列表与最近比赛存档 | `cache/follows.json` |
 | `FOLLOWS_REFRESH_SECONDS` | 关注玩家最近比赛的自动刷新间隔（秒） | `300` |
 | `FOLLOWS_MAX` | 最多关注人数 | `20` |
@@ -348,6 +361,8 @@ MINIMAX_MODEL=MiniMax-M2.7
 | 原始 OpenDota 数据（含录像解析字段） | `cache/raw/*.json` | 否 |
 | 关注玩家与最近比赛缓存 | `cache/follows.json` | 否 |
 | 英雄对位胜率缓存 | `cache/hero_matchups/*.json` | 否 |
+| 分路对位组合缓存 | `cache/lane_matchups.json` | 否 |
+| 英雄装备时机分布缓存 | `cache/item_timings.json` | 否 |
 | 环境变量模板 | `.env.example` | 是（仅占位符） |
 
 API Key 只会写入本机 `cache/llm_settings.json`。`.gitignore` 已显式忽略：
@@ -449,6 +464,8 @@ git ls-files | Select-String -Pattern "llm_settings.json|^cache/|(^|/)\.env$"
 │   │   ├── data_processor.py     # 数据清洗与结构化
 │   │   ├── verdict.py            # 分锅评分：败方责任 / 胜方最佳
 │   │   ├── hero_matchups.py      # 英雄对位胜率缓存
+│   │   ├── lane_matchups.py      # 分路对位组合（Explorer 聚合）
+│   │   ├── item_timings.py       # 英雄装备时机分布
 │   │   ├── follows.py            # Steam ID 解析、关注列表与最近比赛
 │   │   ├── ai_analyzer.py        # 提示词、JSON 解析、AI 建议
 │   │   ├── llm_client.py         # OpenAI / Anthropic 双协议传输

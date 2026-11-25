@@ -40,6 +40,8 @@ BASE_WEIGHTS = {
         "deaths": 0.05,
         "key_deaths": 0.05,
         "teamfight_deaths": 0.03,
+        "teamfight_gold_delta": 0.03,
+        "teamfight_damage_share": 0.03,
         "participation": 0.03,
         "kill_share": 0.04,
         "vision": 0.01,
@@ -62,6 +64,8 @@ BASE_WEIGHTS = {
         "deaths": 0.07,
         "key_deaths": 0.06,
         "teamfight_deaths": 0.04,
+        "teamfight_gold_delta": 0.03,
+        "teamfight_damage_share": 0.03,
         "participation": 0.09,
         "kill_share": 0.08,
         "vision": 0.15,
@@ -135,12 +139,14 @@ _IGNORE_ALL_ZERO = {
     "objectives",
     "key_deaths",
     "teamfight_deaths",
+    "teamfight_gold_delta",
+    "teamfight_damage_share",
 }
 
 METHODOLOGY = (
     "评分综合 KDA、经济、伤害、参团、死亡、视野与目标控制；"
-    "GPM / 补刀 / 英雄伤害会与 OpenDota 同英雄基准混合，对线结合 lane_role、对位英雄克制与 10 分钟经济/经验/补刀差；"
-    "死亡会结合团战时间点，装备会参考关键装备购买时间；"
+    "GPM / 补刀 / 英雄伤害会与 OpenDota 同英雄基准混合，对线结合 lane_role、分路对位样本与 10 分钟经济/经验/补刀差；"
+    "死亡会结合团战时间点，团战经济/伤害来自 teamfights，装备会参考英雄装备时机样本与通用阈值；"
     "经济、伤害、推塔、参团击杀使用队内占比，并按核心 / 辅助位置和所选模式加权。"
     "分数为同队内相对评分，越高代表本场贡献越大；分锅结果仅供复盘参考。"
 )
@@ -152,6 +158,7 @@ class TeamContext:
     total_net_worth: float = 0.0
     total_tower_damage: float = 0.0
     total_kills: float = 0.0
+    total_teamfight_damage: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -289,6 +296,15 @@ METRICS = [
     MetricSpec(
         "teamfight_deaths", "团战死亡", "discipline", False,
         lambda p, c: p.teamfight_deaths, lambda v: f"{v:.0f} 次",
+    ),
+    MetricSpec(
+        "teamfight_gold_delta", "团战经济差", "fight", True,
+        lambda p, c: p.teamfight.teamfight_gold_delta, lambda v: f"{v:+.0f}",
+    ),
+    MetricSpec(
+        "teamfight_damage_share", "团战伤害占比", "damage", True,
+        lambda p, c: _share(p.teamfight.teamfight_damage, c.total_teamfight_damage),
+        _fmt_pct,
     ),
     MetricSpec(
         "participation", "参团率", "team", True,
@@ -467,6 +483,9 @@ def _team_context(team: List[PlayerAnalysis]) -> TeamContext:
         total_net_worth=sum(max(0.0, p.economy.net_worth or 0) for p in team),
         total_tower_damage=sum(max(0.0, p.teamfight.tower_damage or 0) for p in team),
         total_kills=sum(max(0.0, p.teamfight.kills or 0) for p in team),
+        total_teamfight_damage=sum(
+            max(0.0, p.teamfight.teamfight_damage or 0) for p in team
+        ),
     )
 
 
@@ -740,6 +759,7 @@ def _compute_confidence(match: MatchAnalysis):
     lane = sum(1 for p in players if p.laning.lane_score is not None) / count
     matchup = sum(1 for p in players if p.laning.matchup_score is not None) / count
     death_timing = sum(1 for p in players if p.death_timing_available) / count
+    teamfight_data = sum(1 for p in players if p.teamfight_data_available) / count
     vision = sum(1 for p in players if p.vision.available) / count
     participation = sum(
         1 for p in players if p.teamfight.participation_rate is not None
@@ -748,7 +768,7 @@ def _compute_confidence(match: MatchAnalysis):
     timeline = 1.0 if match.timeline else 0.0
 
     confidence = (
-        0.10
+        0.05
         + 0.10 * hero_roles
         + 0.15 * benchmarks
         + 0.20 * lane
@@ -758,6 +778,7 @@ def _compute_confidence(match: MatchAnalysis):
         + 0.05 * participation
         + 0.05 * item_timing
         + 0.05 * timeline
+        + 0.05 * teamfight_data
     )
     confidence = max(0.0, min(1.0, round(confidence, 2)))
 
@@ -772,6 +793,8 @@ def _compute_confidence(match: MatchAnalysis):
         evidence.append("缺少英雄对位胜率，无法修正英雄克制影响")
     if death_timing < 0.5:
         evidence.append("缺少死亡时间/团战窗口，无法计算关键死亡")
+    if teamfight_data < 0.5:
+        evidence.append("缺少团战经济/伤害数据")
     if vision < 0.5:
         evidence.append("缺少视野数据")
     if participation < 0.5:

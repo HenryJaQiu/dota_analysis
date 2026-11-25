@@ -70,6 +70,11 @@
         <div class="stat-card">
             <div class="stat-label">对位英雄胜率</div>
             <div class="stat-value">{{ "%.0f"|format(player.laning.matchup_score) }}%</div>
+            {% if player.laning.matchup_games %}
+            <div class="stat-sub">分路对位 {{ player.laning.matchup_games }} 场</div>
+            {% elif player.laning.matchup_source == "hero" %}
+            <div class="stat-sub">使用英雄总体对位</div>
+            {% endif %}
         </div>
         {% endif %}
     </div>

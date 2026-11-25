@@ -26,7 +26,13 @@
         <span class="key-item-chip">
             <strong>{{ item.item }}</strong>
             <span class="key-item-time">{{ item.time_str }}</span>
-            <span class="key-item-target">目标 {{ item.target_minutes }}m</span>
+            <span class="key-item-target">
+                {% if item.basis == "hero" %}
+                英雄基准 {{ item.sample_games }} 场
+                {% else %}
+                通用阈值 {{ item.target_minutes }}m
+                {% endif %}
+            </span>
         </span>
         {% endfor %}
     </div>

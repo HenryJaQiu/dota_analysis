@@ -29,6 +29,11 @@ class TeamfightAnalysis(BaseModel):
     assists: int
     kda: float
     available: bool
+    teamfight_gold_delta: int = 0
+    teamfight_xp_delta: int = 0
+    teamfight_damage: int = 0
+    teamfight_healing: int = 0
+    teamfight_count: int = 0
 
 
 class ItemAnalysis(BaseModel):
@@ -70,6 +75,8 @@ class LaningAnalysis(BaseModel):
     xp_diff_10: Optional[int] = None
     lh_diff_10: Optional[int] = None
     matchup_score: Optional[float] = None
+    matchup_games: Optional[int] = None
+    matchup_source: Optional[str] = None
     lane_score: Optional[float] = None
     summary: Optional[str] = None
 
@@ -107,6 +114,7 @@ class PlayerAnalysis(BaseModel):
     key_deaths: int = 0
     teamfight_deaths: int = 0
     death_timing_available: bool = False
+    teamfight_data_available: bool = False
     buyback_count: int = 0
     parse_status: ParseStatus
     ai_suggestions: Optional[AISuggestions] = None

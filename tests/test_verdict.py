@@ -90,6 +90,11 @@ def make_player(
             assists=assists,
             kda=round(kda, 2),
             available=True,
+            teamfight_gold_delta=100,
+            teamfight_xp_delta=200,
+            teamfight_damage=damage // 2,
+            teamfight_healing=healing,
+            teamfight_count=1,
         ),
         items=ItemAnalysis(
             final_items=["假腿", "黑皇杖"],
@@ -104,6 +109,9 @@ def make_player(
                 "time_str": "12:00",
                 "target_minutes": 16,
                 "score": key_item_score,
+                "basis": "generic",
+                "sample_games": 0,
+                "percentile": None,
             }],
             key_item_score=key_item_score,
         ),
@@ -131,12 +139,15 @@ def make_player(
             xp_diff_10=xp_diff_10,
             lh_diff_10=lh_diff_10,
             matchup_score=matchup_score,
+            matchup_games=256,
+            matchup_source="lane",
             lane_score=lane_score,
-            summary="对线经济基本持平；对位胜率 50%",
+            summary="对线经济基本持平；对位胜率 50%；分路对位样本 256 场",
         ),
         key_deaths=key_deaths,
         teamfight_deaths=teamfight_deaths,
         death_timing_available=True,
+        teamfight_data_available=True,
         buyback_count=1 if key_deaths else 0,
         parse_status=ParseStatus.PARSED,
     )
@@ -313,6 +324,9 @@ def test_verdict_metrics_benchmarks_shares_and_roles():
         "tower_share",
         "kill_share",
         "key_deaths",
+        "teamfight_deaths",
+        "teamfight_gold_delta",
+        "teamfight_damage_share",
         "lane_evaluation",
         "item_timing",
     ):
@@ -382,6 +396,7 @@ def test_confidence_reports_insufficient_evidence():
         player.laning.lane_score = None
         player.laning.matchup_score = None
         player.death_timing_available = False
+        player.teamfight_data_available = False
         player.key_deaths = 0
         player.teamfight_deaths = 0
         player.items.key_items = []

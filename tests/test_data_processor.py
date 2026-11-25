@@ -1,5 +1,7 @@
 from app.models.match import ParseStatus, RawMatch, RawPlayer
 from app.services.data_processor import DataProcessor
+from app.services.item_timings import timing_percentile
+from app.services.lane_utils import build_lane_pairs
 
 
 def timeline_values(value: int):
@@ -79,3 +81,9 @@ def test_lane_items_death_timing_and_timeline():
 
     event_types = {event.type for event in analysis.timeline}
     assert {"roshan", "tormentor", "tower", "buyback", "item"}.issubset(event_types)
+
+    assert (1, 2, 1) in build_lane_pairs(raw.players)
+    assert timing_percentile(
+        [{"time": 600, "games": 4}, {"time": 900, "games": 6}],
+        700,
+    ) == 40.0

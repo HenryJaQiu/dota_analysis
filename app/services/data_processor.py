@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import Dict, List, Optional
 
+from app.config import settings
 from app.models.match import RawMatch, RawPlayer, ParseStatus
 from app.models.analysis import (
     EconomyAnalysis,
@@ -16,6 +17,8 @@ from app.models.analysis import (
 from app.utils.hero_names import resolve_hero_name
 from app.utils.item_names import resolve_item_name, resolve_rank_name
 from app.services.verdict import build_match_verdict
+from app.services.item_timings import timing_percentile
+from app.services.lane_utils import lane_role_for, physical_lane
 
 LANE_NAMES = {1: "优势路", 2: "中路", 3: "劣势路", 4: "野区"}
 
@@ -53,18 +56,22 @@ class DataProcessor:
         item_map: Dict[int, str],
         hero_roles: Dict[int, List[str]] = None,
         matchups: Dict[int, Dict[int, float]] = None,
+        lane_matchups: Dict[tuple, Dict[str, float]] = None,
+        item_timings: Dict[int, Dict[str, List[dict]]] = None,
     ):
         self.hero_map = hero_map
         self.item_map = item_map
         self.hero_roles = hero_roles or {}
         self.matchups = matchups or {}
+        self.lane_matchups = lane_matchups or {}
+        self.item_timings = item_timings or {}
 
     def process_match(self, raw: RawMatch, parse_status: ParseStatus) -> MatchAnalysis:
         objectives = raw.objectives or []
         teamfights = raw.teamfights or []
         players = [
-            self._process_player(p, raw, parse_status, objectives, teamfights)
-            for p in raw.players
+            self._process_player(p, raw, parse_status, objectives, teamfights, index)
+            for index, p in enumerate(raw.players)
         ]
         if parse_status == ParseStatus.PARSED:
             self._apply_lane_evaluation(players, raw)
@@ -90,6 +97,7 @@ class DataProcessor:
         parse_status: ParseStatus,
         objectives: list,
         teamfights: list,
+        player_index: int,
     ) -> PlayerAnalysis:
         team = "天辉" if p.player_slot < 128 else "夜魇"
         hero_name = resolve_hero_name(p.hero_id, self.hero_map)
@@ -107,7 +115,7 @@ class DataProcessor:
             buyback_count = len(p.buyback_log or [])
 
         economy = self._process_economy(p)
-        teamfight = self._process_teamfight(p, is_parsed)
+        teamfight = self._process_teamfight(p, is_parsed, teamfights, player_index)
         items = self._process_items(p)
         vision = self._process_vision(p, is_parsed)
         obj = self._process_objectives(p, match, objectives, is_parsed)
@@ -130,6 +138,9 @@ class DataProcessor:
             key_deaths=key_deaths,
             teamfight_deaths=teamfight_deaths,
             death_timing_available=death_timing_available,
+            teamfight_data_available=bool(
+                is_parsed and teamfights and teamfight.teamfight_count > 0
+            ),
             buyback_count=buyback_count,
             parse_status=parse_status,
         )
@@ -189,16 +200,7 @@ class DataProcessor:
             return None
 
     def _physical_lane(self, player: RawPlayer) -> Optional[int]:
-        if player.lane in (1, 2, 3):
-            return player.lane
-        radiant = player.player_slot < 128
-        if player.lane_role == 2:
-            return 2
-        if player.lane_role == 1:
-            return 1 if radiant else 3
-        if player.lane_role == 3:
-            return 3 if radiant else 1
-        return None
+        return physical_lane(player)
 
     def _apply_lane_evaluation(
         self, players: List[PlayerAnalysis], raw: RawMatch
@@ -255,13 +257,37 @@ class DataProcessor:
                 target.laning.lh_diff_10 = int(round(own_lh - sum(opp_lh) / len(opp_lh)))
 
             matchup = self.matchups.get(raw_player.hero_id) or {}
-            rates = [
-                matchup[other.hero_id]
-                for other in opponents
-                if other.hero_id in matchup
-            ]
+            role = lane_role_for(raw_player)
+            lane_rates = []
+            lane_games = 0
+            overall_rates = []
+            for other in opponents:
+                pair = (
+                    self.lane_matchups.get(
+                        (int(raw_player.hero_id), int(other.hero_id), int(role))
+                    )
+                    if role in (1, 2, 3)
+                    else None
+                )
+                if pair and pair.get("games", 0) >= settings.lane_matchup_min_games:
+                    lane_rates.append(pair.get("win_rate", 50.0))
+                    lane_games += int(pair.get("games", 0))
+                else:
+                    overall = matchup.get(other.hero_id)
+                    if overall is not None:
+                        overall_rates.append(overall)
+
+            rates = lane_rates + overall_rates
             if rates:
                 target.laning.matchup_score = round(sum(rates) / len(rates), 1)
+                if lane_rates and overall_rates:
+                    target.laning.matchup_source = "mixed"
+                elif lane_rates:
+                    target.laning.matchup_source = "lane"
+                else:
+                    target.laning.matchup_source = "hero"
+                if lane_games:
+                    target.laning.matchup_games = lane_games
 
             components = []
             if target.laning.gold_diff_10 is not None:
@@ -310,6 +336,10 @@ class DataProcessor:
                 elif target.laning.matchup_score > 55:
                     summary_parts.append(
                         f"对位有优势（胜率 {target.laning.matchup_score:.0f}%）"
+                    )
+                if target.laning.matchup_games:
+                    summary_parts.append(
+                        f"分路对位样本 {target.laning.matchup_games} 场"
                     )
             target.laning.summary = "；".join(summary_parts) or None
 
@@ -447,6 +477,10 @@ class DataProcessor:
 
         for player in players:
             for item in player.items.key_items:
+                if item.get("basis") == "hero":
+                    detail = f"英雄基准 {item.get('sample_games')} 场"
+                else:
+                    detail = f"通用阈值 {item.get('target_minutes')} 分钟"
                 add_event(
                     item.get("time"),
                     "item",
@@ -455,7 +489,7 @@ class DataProcessor:
                     team=player.team,
                     player_slot=player.player_slot,
                     hero_name=player.hero_name,
-                    detail=f"目标 {item.get('target_minutes')} 分钟",
+                    detail=detail,
                 )
 
         events.sort(key=lambda event: (event.time, event.type))
@@ -496,11 +530,38 @@ class DataProcessor:
             gold_timeline_step=gold_timeline_step,
         )
 
-    def _process_teamfight(self, p: RawPlayer, is_parsed: bool) -> TeamfightAnalysis:
+    def _process_teamfight(
+        self,
+        p: RawPlayer,
+        is_parsed: bool,
+        teamfights: list,
+        player_index: int,
+    ) -> TeamfightAnalysis:
         deaths = p.deaths or 0
         kills = p.kills or 0
         assists = p.assists or 0
         kda = (kills + assists) / max(deaths, 1)
+
+        gold_delta = 0
+        xp_delta = 0
+        fight_damage = 0
+        fight_healing = 0
+        fight_count = 0
+        if is_parsed:
+            for fight in teamfights:
+                if not isinstance(fight, dict):
+                    continue
+                entries = fight.get("players") or []
+                if player_index >= len(entries):
+                    continue
+                entry = entries[player_index]
+                if not isinstance(entry, dict):
+                    continue
+                fight_count += 1
+                gold_delta += int(entry.get("gold_delta") or 0)
+                xp_delta += int(entry.get("xp_delta") or 0)
+                fight_damage += int(entry.get("damage") or 0)
+                fight_healing += int(entry.get("healing") or 0)
 
         bm = p.benchmarks
         dmg_pct = None
@@ -520,6 +581,11 @@ class DataProcessor:
             assists=assists,
             kda=round(kda, 2),
             available=is_parsed or (p.hero_damage is not None),
+            teamfight_gold_delta=gold_delta,
+            teamfight_xp_delta=xp_delta,
+            teamfight_damage=fight_damage,
+            teamfight_healing=fight_healing,
+            teamfight_count=fight_count,
         )
 
     def _process_items(self, p: RawPlayer) -> ItemAnalysis:
@@ -546,6 +612,7 @@ class DataProcessor:
 
         key_items = []
         seen_items = set()
+        item_distributions = self.item_timings.get(p.hero_id, {})
         if p.purchase_log:
             for entry in p.purchase_log:
                 if not isinstance(entry, dict):
@@ -561,11 +628,23 @@ class DataProcessor:
                 if time_value < 0:
                     continue
                 seen_items.add(item_key)
-                minutes = time_value / 60.0
-                timing_score = max(
-                    0.0,
-                    min(100.0, 100.0 - max(0.0, minutes - threshold) * 8.0),
+                rows = item_distributions.get(item_key)
+                percentile = timing_percentile(rows, time_value)
+                sample_games = (
+                    sum(int(row.get("games") or 0) for row in rows)
+                    if rows
+                    else 0
                 )
+                if percentile is not None:
+                    timing_score = max(0.0, min(100.0, 100.0 - percentile))
+                    basis = "hero"
+                else:
+                    minutes = time_value / 60.0
+                    timing_score = max(
+                        0.0,
+                        min(100.0, 100.0 - max(0.0, minutes - threshold) * 8.0),
+                    )
+                    basis = "generic"
                 key_items.append({
                     "item_key": item_key,
                     "item": resolve_item_name(item_key, self.item_map),
@@ -573,6 +652,9 @@ class DataProcessor:
                     "time_str": self._format_time(time_value),
                     "target_minutes": threshold,
                     "score": round(timing_score, 1),
+                    "basis": basis,
+                    "sample_games": sample_games,
+                    "percentile": percentile,
                 })
         key_items.sort(key=lambda item: item["time"])
         key_item_score = (

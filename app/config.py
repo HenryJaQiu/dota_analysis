@@ -49,6 +49,12 @@ class Settings(BaseSettings):
     verdict_weights_file: str = "cache/verdict_weights.json"
     hero_matchup_cache_dir: str = "cache/hero_matchups"
     hero_matchup_cache_seconds: int = 604800
+    lane_matchup_cache_file: str = "cache/lane_matchups.json"
+    lane_matchup_cache_seconds: int = 604800
+    lane_matchup_min_games: int = 10
+    item_timing_cache_file: str = "cache/item_timings.json"
+    item_timing_cache_seconds: int = 604800
+    item_timing_min_games: int = 8
 
     # ===== Followed players =====
     follows_file: str = "cache/follows.json"
