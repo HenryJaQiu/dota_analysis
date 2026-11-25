@@ -44,6 +44,10 @@ class Settings(BaseSettings):
     parse_poll_interval: int = 10
     parse_max_attempts: int = 30
 
+    # ===== Verdict scoring =====
+    verdict_mode: str = "balanced"
+    verdict_weights_file: str = "cache/verdict_weights.json"
+
     # ===== Followed players =====
     follows_file: str = "cache/follows.json"
     follows_refresh_seconds: int = 300

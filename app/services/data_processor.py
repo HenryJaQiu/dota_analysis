@@ -20,14 +20,21 @@ LANE_NAMES = {1: "优势路", 2: "中路", 3: "劣势路", 4: "野区"}
 
 
 class DataProcessor:
-    def __init__(self, hero_map: Dict[int, str], item_map: Dict[int, str]):
+    def __init__(
+        self,
+        hero_map: Dict[int, str],
+        item_map: Dict[int, str],
+        hero_roles: Dict[int, List[str]] = None,
+    ):
         self.hero_map = hero_map
         self.item_map = item_map
+        self.hero_roles = hero_roles or {}
 
     def process_match(self, raw: RawMatch, parse_status: ParseStatus) -> MatchAnalysis:
         objectives = raw.objectives or []
+        teamfights = raw.teamfights or []
         players = [
-            self._process_player(p, raw, parse_status, objectives)
+            self._process_player(p, raw, parse_status, objectives, teamfights)
             for p in raw.players
         ]
         analysis = MatchAnalysis(
@@ -48,11 +55,15 @@ class DataProcessor:
         match: RawMatch,
         parse_status: ParseStatus,
         objectives: list,
+        teamfights: list,
     ) -> PlayerAnalysis:
         team = "天辉" if p.player_slot < 128 else "夜魇"
         hero_name = resolve_hero_name(p.hero_id, self.hero_map)
         rank_name = resolve_rank_name(p.rank_tier)
         is_parsed = parse_status == ParseStatus.PARSED
+        key_deaths, teamfight_deaths = self._death_metrics(
+            p.deaths_log, teamfights, is_parsed
+        )
 
         economy = self._process_economy(p)
         teamfight = self._process_teamfight(p, is_parsed)
@@ -68,14 +79,62 @@ class DataProcessor:
             personaname=p.personaname,
             rank_tier=p.rank_tier,
             rank_name=rank_name,
+            hero_roles=self.hero_roles.get(p.hero_id, []),
             economy=economy,
             teamfight=teamfight,
             items=items,
             vision=vision,
             objectives=obj,
             laning=laning,
+            key_deaths=key_deaths,
+            teamfight_deaths=teamfight_deaths,
             parse_status=parse_status,
         )
+
+    def _death_metrics(self, death_log, teamfights: list, is_parsed: bool):
+        if not is_parsed or not death_log:
+            return 0, 0
+
+        death_times = []
+        for entry in death_log:
+            if not isinstance(entry, dict):
+                continue
+            try:
+                death_times.append(int(entry.get("time")))
+            except (TypeError, ValueError):
+                continue
+
+        windows = []
+        for fight in teamfights:
+            if not isinstance(fight, dict):
+                continue
+            try:
+                start = int(fight.get("start"))
+                end = int(fight.get("end"))
+            except (TypeError, ValueError):
+                continue
+            if end >= start:
+                windows.append((start, end))
+        windows.sort()
+
+        pre_fight = 0
+        early_fight = 0
+        during_fight = 0
+        for death_time in death_times:
+            for start, end in windows:
+                if start - 10 <= death_time < start:
+                    pre_fight += 1
+                    break
+                if start <= death_time <= start + 10:
+                    early_fight += 1
+                    break
+                if start <= death_time <= end:
+                    during_fight += 1
+                    break
+
+        key_deaths = pre_fight + early_fight
+        teamfight_deaths = pre_fight + early_fight + during_fight
+        return key_deaths, teamfight_deaths
 
     def _process_economy(self, p: RawPlayer) -> EconomyAnalysis:
         bm = p.benchmarks
@@ -83,9 +142,13 @@ class DataProcessor:
         lh_pct = None
         if bm:
             if bm.gold_per_min:
-                gpm_pct = round(bm.gold_per_min.get("pct", 0) * 100, 1)
+                pct = bm.gold_per_min.get("pct")
+                if pct is not None:
+                    gpm_pct = round(pct * 100, 1)
             if bm.last_hits_per_min:
-                lh_pct = round(bm.last_hits_per_min.get("pct", 0) * 100, 1)
+                pct = bm.last_hits_per_min.get("pct")
+                if pct is not None:
+                    lh_pct = round(pct * 100, 1)
 
         gold_timeline = None
         gold_timeline_step = 1
@@ -117,7 +180,9 @@ class DataProcessor:
         bm = p.benchmarks
         dmg_pct = None
         if bm and bm.hero_damage_per_min:
-            dmg_pct = round(bm.hero_damage_per_min.get("pct", 0) * 100, 1)
+            pct = bm.hero_damage_per_min.get("pct")
+            if pct is not None:
+                dmg_pct = round(pct * 100, 1)
 
         return TeamfightAnalysis(
             participation_rate=p.teamfight_participation if is_parsed else None,

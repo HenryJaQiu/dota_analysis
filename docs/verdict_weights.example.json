@@ -1,0 +1,23 @@
+{
+  "strict": {
+    "core": {
+      "deaths": 2.0,
+      "key_deaths": 2.2,
+      "economy_share": 1.3
+    },
+    "support": {
+      "key_deaths": 1.3,
+      "vision": 0.7
+    }
+  },
+  "gentle": {
+    "core": {
+      "deaths": 0.4,
+      "key_deaths": 0.4
+    },
+    "support": {
+      "vision": 1.4,
+      "healing": 1.3
+    }
+  }
+}

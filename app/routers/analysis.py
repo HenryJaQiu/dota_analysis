@@ -18,8 +18,8 @@ from app.services.cache import get_cache
 from app.services.data_processor import DataProcessor
 from app.services.llm_settings import get_llm_config, public_settings
 from app.services.opendota import MatchNotFoundError, OpenDotaAPIError, get_client
-from app.services.verdict import build_match_verdict
-from app.utils.hero_names import get_hero_map
+from app.services.verdict import PROFILE_LABELS, build_match_verdict, resolve_profile
+from app.utils.hero_names import get_hero_maps
 from app.utils.item_names import get_item_map
 
 logger = logging.getLogger(__name__)
@@ -84,9 +84,10 @@ async def analyze_match(match_id: str = Form(...)):
 
 
 @router.get("/match/{match_id}", response_class=HTMLResponse)
-async def get_match(request: Request, match_id: int):
+async def get_match(request: Request, match_id: int, verdict_mode: str = ""):
     cache = get_cache()
     cached = cache.get(match_id)
+    mode = resolve_profile(verdict_mode)
     if cached:
         parse_refreshing = False
         if cached.parse_status != ParseStatus.PARSED:
@@ -95,7 +96,7 @@ async def get_match(request: Request, match_id: int):
                 job and job["status"] in {"queued", "running"}
             )
         else:
-            _ensure_verdict(cached, cache, match_id)
+            _ensure_verdict(cached, cache, match_id, mode)
 
         ai_model = next(
             (
@@ -112,18 +113,23 @@ async def get_match(request: Request, match_id: int):
             "parse_refreshing": parse_refreshing,
             "ai_model": ai_model,
             "llm": public_settings(),
+            "verdict_mode": mode,
+            "verdict_modes": list(PROFILE_LABELS.items()),
         })
 
     await get_job_manager().start_job(match_id, _run_analysis_job)
     return RedirectResponse(url=f"/?match_id={match_id}")
 
 
-def _ensure_verdict(analysis, cache, match_id: int) -> None:
-    if analysis.parse_status != ParseStatus.PARSED or analysis.verdict is not None:
+def _ensure_verdict(analysis, cache, match_id: int, mode: str) -> None:
+    if analysis.parse_status != ParseStatus.PARSED:
         return
-    verdict = build_match_verdict(analysis)
-    if verdict:
-        analysis.verdict = verdict
+    verdict = build_match_verdict(analysis, profile=mode)
+    if not verdict:
+        return
+    changed = analysis.verdict != verdict
+    analysis.verdict = verdict
+    if changed:
         cache.set(match_id, analysis)
 
 
@@ -308,10 +314,10 @@ async def _process_match(
 ):
     client = get_client()
     await jobs.set_progress(match_id, "正在加载英雄与道具映射", kind=kind)
-    hero_map, item_map = await _load_maps(client)
+    hero_map, item_map, hero_roles = await _load_maps(client)
 
     await jobs.set_progress(match_id, "正在整理比赛数据", kind=kind)
-    processor = DataProcessor(hero_map, item_map)
+    processor = DataProcessor(hero_map, item_map, hero_roles)
     analysis = processor.process_match(raw_match, parse_status)
 
     if generate_ai:
@@ -327,9 +333,10 @@ async def _process_match(
 
 
 async def _load_maps(client):
-    hero_task = get_hero_map(client)
+    hero_task = get_hero_maps(client)
     item_task = get_item_map(client)
-    return await asyncio.gather(hero_task, item_task)
+    (hero_map, hero_roles), item_map = await asyncio.gather(hero_task, item_task)
+    return hero_map, item_map, hero_roles
 
 
 @router.get("/api/jobs/{match_id}")
@@ -534,10 +541,10 @@ async def _run_reanalysis_job(match_id: int) -> None:
 
 
 @router.get("/api/match/{match_id}/data")
-async def match_data_api(match_id: int):
+async def match_data_api(match_id: int, verdict_mode: str = ""):
     cache = get_cache()
     analysis = cache.get(match_id)
     if not analysis:
         return JSONResponse({"error": "Not found"}, status_code=404)
-    _ensure_verdict(analysis, cache, match_id)
+    _ensure_verdict(analysis, cache, match_id, resolve_profile(verdict_mode))
     return JSONResponse({"analysis": analysis.model_dump(mode="json")})

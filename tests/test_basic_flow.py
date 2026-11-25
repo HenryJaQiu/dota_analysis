@@ -52,7 +52,7 @@ def test_basic_data_is_saved_immediately_and_parse_job_starts(tmp_path, monkeypa
     parse_jobs = []
 
     async def fake_load_maps(client):
-        return {1: "主宰"}, {}
+        return {1: "主宰"}, {}, {1: ["Carry", "Escape"]}
 
     async def fake_ensure_parse_job(match_id):
         parse_jobs.append(match_id)

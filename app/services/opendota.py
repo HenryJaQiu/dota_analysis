@@ -110,8 +110,21 @@ class OpenDotaClient:
         return match, ParseStatus.FAILED
 
     async def fetch_heroes(self) -> Dict[int, str]:
+        data = await self.fetch_hero_data()
+        return {
+            hero_id: hero.get("localized_name", f"Hero#{hero_id}")
+            for hero_id, hero in data.items()
+        }
+
+    async def fetch_hero_data(self) -> Dict[int, dict]:
         data = await self._get("/heroes")
-        return {hero["id"]: hero.get("localized_name", f"Hero#{hero['id']}") for hero in data}
+        if not isinstance(data, list):
+            raise OpenDotaAPIError("英雄数据格式无法识别")
+        return {
+            int(hero["id"]): hero
+            for hero in data
+            if isinstance(hero, dict) and hero.get("id") is not None
+        }
 
     async def fetch_items(self) -> Dict[int, str]:
         data = await self._get("/constants/items")

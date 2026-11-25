@@ -87,14 +87,31 @@ class PlayerAnalysis(BaseModel):
     personaname: Optional[str] = None
     rank_tier: Optional[int] = None
     rank_name: str = ""
+    hero_roles: List[str] = []
     economy: EconomyAnalysis
     teamfight: TeamfightAnalysis
     items: ItemAnalysis
     vision: VisionAnalysis
     objectives: ObjectiveAnalysis
     laning: LaningAnalysis
+    # Parsed death timing: deaths in a teamfight or just before one.
+    key_deaths: int = 0
+    teamfight_deaths: int = 0
     parse_status: ParseStatus
     ai_suggestions: Optional[AISuggestions] = None
+
+
+class VerdictMetric(BaseModel):
+    key: str
+    label: str
+    value: str
+    score: float
+    weight: float
+    contribution: float
+    rank: int = 0
+    team_score: Optional[float] = None
+    benchmark_score: Optional[float] = None
+    note: Optional[str] = None
 
 
 class PlayerVerdict(BaseModel):
@@ -106,6 +123,7 @@ class PlayerVerdict(BaseModel):
     score: float = 0.0
     rank: int = 0
     reasons: List[str] = []
+    metrics: List[VerdictMetric] = []
 
 
 class MatchVerdict(BaseModel):
@@ -116,6 +134,8 @@ class MatchVerdict(BaseModel):
     winner_rankings: List[PlayerVerdict] = []
     loser_rankings: List[PlayerVerdict] = []
     methodology: str = ""
+    profile: str = "balanced"
+    profile_label: str = ""
 
 
 class MatchAnalysis(BaseModel):

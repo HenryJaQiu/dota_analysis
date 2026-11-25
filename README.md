@@ -25,6 +25,10 @@
 
 ![比赛详情](docs/screenshots/match.png)
 
+### 评分明细
+
+![评分明细](docs/screenshots/verdict.png)
+
 ### 关注玩家
 
 ![关注玩家](docs/screenshots/follows.png)
@@ -38,7 +42,8 @@
 - 结构化分析：经济、团战、出装、视野、目标控制、对线
 - 经济曲线可视化（所有人 / 阵营对比 / 当前玩家）
 - AI 中文复盘建议，按玩家生成，包含模型标识与生成时间
-- **解析后分锅分析**：败方最大责任、胜方最佳玩家、五人排名与数据理由
+- **解析后分锅分析**：败方最大责任、胜方最佳玩家、五人排名、英雄基准、队内占比、关键死亡与评分明细
+- **三种评分模式**：均衡评估 / 严格分锅 / 温和复盘，权重可自定义
 - **Steam 好友关注**：输入好友代码 / SteamID64 / 个人主页，自动获取最近比赛 ID 并快速分析
 - **本地永久存档**：分析结果、原始 OpenDota 数据和录像解析字段都保存在本地，后续可直接复查
 - 多模型 GUI：来源预设、Base URL、API Key、模型列表、连接测试、超时与并发设置
@@ -123,11 +128,62 @@ python main.py
 - **败方最大责任**：败方五人中综合表现评分最低的玩家
 - **胜方最佳玩家**：胜方五人中综合表现评分最高的玩家
 - 两位玩家都会给出评分、位置（核心 / 辅助）和具体数据理由
-- 展开可查看胜方 / 败方完整五人排名
+- 可展开查看胜方 / 败方完整五人排名，以及每项指标的评分明细
 
-评分会综合 KDA、GPM/XPM、补刀、净身价、英雄与推塔伤害、参团率、死亡次数、视野和目标控制，并按核心 / 辅助位置加权。评分是同队内相对分数，越高代表本场贡献越大。
+### 评分现在包含什么
 
-> 分锅结果是数据模型评估，不代表唯一结论；位置根据经济与补刀推断，极端阵容可能判断不准。
+1. **同英雄基准**：GPM、补刀、英雄伤害会与 OpenDota 同英雄基准百分位各按 50% 混合，减少“不同英雄天生伤害/经济不同”的偏差。
+2. **英雄定位**：优先使用 OpenDota 的英雄角色数据（Carry / Support 等），再结合经济与补刀判断核心 / 辅助；不是只看钱。
+3. **队内占比**：经济占比、伤害占比、推塔占比、参团击杀占比。
+4. **死亡时间**：除了死亡总数，还会统计「关键死亡」：
+   - 团战开始前 10 秒内死亡
+   - 团战开始后 10 秒内死亡
+   这些死亡会视为更关键的减员，权重更高。
+5. **常规维度**：KDA、XPM、净身价、参团率、视野贡献、治疗量、目标参与。
+6. **位置权重**：核心更看经济/伤害/KDA，辅助更看参团/视野/治疗/目标。
+
+评分是**同队内相对分数**，越高代表本场贡献越大。每个指标的得分、归一化权重和贡献会显示在「评分明细」表格里。
+
+### 三种模式
+
+比赛详情页顶部可以切换：
+
+| 模式 | 特点 |
+| --- | --- |
+| 均衡评估 | 默认，经济/伤害/死亡/参团/视野平衡 |
+| 严格分锅 | 提高死亡、关键死亡、经济与伤害差距的权重，责任判定更严厉 |
+| 温和复盘 | 降低死亡惩罚，更强调参团、视野、治疗和目标贡献 |
+
+默认模式可在 `.env` 设置：
+
+```env
+VERDICT_MODE=balanced
+```
+
+### 自定义权重
+
+把 `docs/verdict_weights.example.json` 复制到 `cache/verdict_weights.json` 后修改。文件里填的是**倍率**，会乘到对应指标的基础权重上：
+
+```json
+{
+  "strict": {
+    "core": {
+      "deaths": 2.0,
+      "key_deaths": 2.2,
+      "economy_share": 1.3
+    },
+    "support": {
+      "vision": 0.7
+    }
+  }
+}
+```
+
+- 也可以写成扁平形式，同时作用于核心和辅助
+- `cache/verdict_weights.json` 已被 Git 忽略
+- 指标 key 包括：`gpm`、`xpm`、`last_hits`、`net_worth`、`economy_share`、`hero_damage`、`damage_share`、`tower_damage`、`tower_share`、`kda`、`deaths`、`key_deaths`、`participation`、`kill_share`、`vision`、`healing`、`objectives`
+
+> 分锅结果是数据模型评估，不代表唯一结论。位置由英雄定位 + 经济/补刀推断；死亡时间基于 OpenDota 的 `deaths_log` 与团战窗口近似；没有纳入对线对手、英雄克制、指挥和空间创造等无法量化的因素。
 
 ## 关注玩家
 
@@ -205,6 +261,8 @@ OpenCode Go 同时提供两种协议：
 | `RAW_CACHE_DIR` | 原始 OpenDota 数据（含解析字段）存档目录 | `cache/raw` |
 | `PARSE_POLL_INTERVAL` | 后台检查录像解析的间隔（秒） | `10` |
 | `PARSE_MAX_ATTEMPTS` | 后台最多检查次数 | `30` |
+| `VERDICT_MODE` | 默认分锅模式：`balanced` / `strict` / `gentle` | `balanced` |
+| `VERDICT_WEIGHTS_FILE` | 自定义权重倍率文件 | `cache/verdict_weights.json` |
 | `FOLLOWS_FILE` | 关注列表与最近比赛存档 | `cache/follows.json` |
 | `FOLLOWS_REFRESH_SECONDS` | 关注玩家最近比赛的自动刷新间隔（秒） | `300` |
 | `FOLLOWS_MAX` | 最多关注人数 | `20` |
@@ -359,7 +417,8 @@ git ls-files | Select-String -Pattern "llm_settings.json|^cache/|(^|/)\.env$"
 ├── static/js/settings.js         # 模型设置 GUI
 ├── static/js/follows.js          # 关注玩家 GUI
 ├── tests/                        # 解析、分锅、关注与配置单元测试
-└── docs/screenshots/             # README 截图
+├── docs/screenshots/             # README 截图
+└── docs/verdict_weights.example.json  # 自定义分锅权重示例
 ```
 
 ## 测试
@@ -464,6 +523,7 @@ git push -u origin main
 - 删除 `cache/` 会同时删除已保存的 API Key 配置
 - OpenDota 对未解析录像需要等待，页面会先展示基础数据并在后台自动升级
 - 分锅分析依赖录像解析数据，基础数据阶段不会生成
+- 分锅评分会在打开详情页时按当前模式和自定义权重重新计算；旧缓存会自动补齐评分明细
 - 关注列表与最近比赛缓存在 `cache/follows.json`，默认 5 分钟自动刷新
 - Steam 隐私设置会限制 OpenDota 能获取到的最近比赛
 - 进程内任务管理适合单机使用；多实例部署需要换成 Redis / 队列

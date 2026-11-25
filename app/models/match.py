@@ -71,6 +71,7 @@ class RawPlayer(BaseModel):
     lane_role: Optional[int] = None
     is_roaming: Optional[bool] = None
     purchase_log: Optional[List[Dict[str, Any]]] = None
+    deaths_log: Optional[List[Dict[str, Any]]] = None
     actions_per_min: Optional[int] = None
     life_state_dead: Optional[int] = None
     total_gold: Optional[int] = None

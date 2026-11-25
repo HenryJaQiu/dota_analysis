@@ -1,5 +1,9 @@
 {% if analysis.verdict %}
-<section class="verdict-section">
+{% set blame = analysis.verdict.most_responsible %}
+{% set mvp = analysis.verdict.best_player %}
+{% set modes = verdict_modes|default([('balanced', '均衡评估'), ('strict', '严格分锅'), ('gentle', '温和复盘')]) %}
+{% set current_mode = verdict_mode|default('balanced') %}
+<section class="verdict-section" id="verdict">
     <div class="verdict-head">
         <div>
             <h2>本局分锅</h2>
@@ -8,25 +12,44 @@
         <span class="verdict-badge">数据模型</span>
     </div>
 
+    <div class="verdict-toolbar">
+        <div class="verdict-modes">
+            {% for key, label in modes %}
+            <a class="verdict-mode {% if key == current_mode %}active{% endif %}"
+               href="/match/{{ analysis.match_id }}?verdict_mode={{ key }}#verdict">{{ label }}</a>
+            {% endfor %}
+        </div>
+        <span class="verdict-profile">
+            {{ analysis.verdict.profile_label or analysis.verdict.profile or "均衡评估" }}
+        </span>
+    </div>
+
     <div class="verdict-grid">
         <article class="verdict-card verdict-blame">
             <div class="verdict-kicker">败方最大责任 · {{ analysis.verdict.loser_team }}</div>
             <div class="verdict-player">
-                <span class="verdict-hero">{{ analysis.verdict.most_responsible.hero_name }}</span>
-                <span class="verdict-name">{{ analysis.verdict.most_responsible.personaname or "匿名" }}</span>
-                <span class="verdict-role">{{ analysis.verdict.most_responsible.role }}</span>
+                <span class="verdict-hero">{{ blame.hero_name }}</span>
+                <span class="verdict-name">{{ blame.personaname or "匿名" }}</span>
+                <span class="verdict-role">{{ blame.role }}</span>
             </div>
             <div class="verdict-score-row">
                 <span class="verdict-score-label">表现评分</span>
-                <strong>{{ "%.1f"|format(analysis.verdict.most_responsible.score) }}</strong>
+                <strong>{{ "%.1f"|format(blame.score) }}</strong>
                 <span class="verdict-score-max">/ 100</span>
                 <span class="verdict-score-hint">越低责任越大</span>
             </div>
             <ul class="verdict-reasons">
-                {% for reason in analysis.verdict.most_responsible.reasons %}
+                {% for reason in blame.reasons %}
                 <li>{{ reason }}</li>
                 {% endfor %}
             </ul>
+
+            <details class="verdict-details">
+                <summary>查看评分明细</summary>
+                {% set player = blame %}
+                {% include "partials/verdict_metrics.html" %}
+            </details>
+
             <details class="verdict-details">
                 <summary>查看败方五人排名</summary>
                 <ol class="verdict-ranking">
@@ -48,21 +71,28 @@
         <article class="verdict-card verdict-mvp">
             <div class="verdict-kicker">胜方最佳 · {{ analysis.verdict.winner_team }}</div>
             <div class="verdict-player">
-                <span class="verdict-hero">{{ analysis.verdict.best_player.hero_name }}</span>
-                <span class="verdict-name">{{ analysis.verdict.best_player.personaname or "匿名" }}</span>
-                <span class="verdict-role">{{ analysis.verdict.best_player.role }}</span>
+                <span class="verdict-hero">{{ mvp.hero_name }}</span>
+                <span class="verdict-name">{{ mvp.personaname or "匿名" }}</span>
+                <span class="verdict-role">{{ mvp.role }}</span>
             </div>
             <div class="verdict-score-row">
                 <span class="verdict-score-label">表现评分</span>
-                <strong>{{ "%.1f"|format(analysis.verdict.best_player.score) }}</strong>
+                <strong>{{ "%.1f"|format(mvp.score) }}</strong>
                 <span class="verdict-score-max">/ 100</span>
                 <span class="verdict-score-hint">越高表现越好</span>
             </div>
             <ul class="verdict-reasons">
-                {% for reason in analysis.verdict.best_player.reasons %}
+                {% for reason in mvp.reasons %}
                 <li>{{ reason }}</li>
                 {% endfor %}
             </ul>
+
+            <details class="verdict-details">
+                <summary>查看评分明细</summary>
+                {% set player = mvp %}
+                {% include "partials/verdict_metrics.html" %}
+            </details>
+
             <details class="verdict-details">
                 <summary>查看胜方五人排名</summary>
                 <ol class="verdict-ranking">
