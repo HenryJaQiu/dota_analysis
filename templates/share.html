@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="generator" content="Dota 2 Review Assistant">
+    <title>Dota 2 复盘报告 · 比赛 #{{ analysis.match_id }}</title>
+    <style>
+{{ inline_css|safe }}
+
+/* ===== Static share page ===== */
+.share-header {
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.share-header .logo { cursor: default; }
+
+.share-header-meta {
+    color: var(--text-secondary);
+    font-size: 0.78rem;
+}
+
+.share-badge {
+    color: var(--gold);
+    border: 1px solid rgba(246, 201, 14, 0.35);
+    background: rgba(246, 201, 14, 0.08);
+    border-radius: 999px;
+    padding: 5px 12px;
+    font-size: 0.8rem;
+}
+
+.share-footer {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px 16px 40px;
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    text-align: center;
+    line-height: 1.8;
+}
+    </style>
+</head>
+<body class="share-page">
+    <header class="site-header share-header">
+        <span class="logo">
+            <span class="logo-icon">D2</span>
+            <span>Dota 2 复盘报告</span>
+        </span>
+        <span class="share-header-meta">
+            比赛 #{{ analysis.match_id }} · 生成于 {{ generated_at.strftime("%Y-%m-%d %H:%M") }}
+        </span>
+    </header>
+
+    <main class="container">
+        {% include "partials/match_report.html" %}
+    </main>
+
+    <footer class="share-footer">
+        数据来源 OpenDota · 分锅分析为数据模型评估，仅供复盘参考
+    </footer>
+
+    <script>
+        window.MATCH_DATA = {{ analysis.model_dump(mode="json") | tojson | safe }};
+    </script>
+    <script>{{ inline_app_js|safe }}</script>
+    <script>{{ inline_charts_js|safe }}</script>
+</body>
+</html>

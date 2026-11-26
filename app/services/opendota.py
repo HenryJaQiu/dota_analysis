@@ -48,6 +48,19 @@ class OpenDotaClient:
                     logger.warning(f"OpenDota rate limit, waiting {wait}s")
                     await asyncio.sleep(wait)
                     continue
+                if response.status_code >= 500:
+                    if attempt < max_retries - 1:
+                        wait = 2 ** attempt
+                        logger.warning(
+                            "OpenDota server error %s, retrying in %ss",
+                            response.status_code,
+                            wait,
+                        )
+                        await asyncio.sleep(wait)
+                        continue
+                    raise OpenDotaAPIError(
+                        f"OpenDota API 错误: {response.status_code}（服务暂时不可用）"
+                    )
                 response.raise_for_status()
                 return response.json()
             except httpx.TimeoutException:

@@ -535,6 +535,8 @@ async def refresh_follows(force: bool = False) -> Dict[str, Any]:
                     )
                 except Exception as exc:
                     message = str(exc)[:220]
+                    if player.get("matches"):
+                        message = f"已保留上次数据：{message}"
                     errors.append({
                         "account_id": account_id,
                         "personaname": player.get("personaname", ""),

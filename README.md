@@ -33,6 +33,10 @@
 
 ![比赛时间轴](docs/screenshots/timeline.png)
 
+### 静态分享
+
+![静态分享](docs/screenshots/share.png)
+
 ### 关注玩家
 
 ![关注玩家](docs/screenshots/follows.png)
@@ -52,6 +56,7 @@
 - **分锅置信度**：高 / 中 / 低 / 证据不足，并列出缺失的数据来源
 - **三种评分模式**：均衡评估 / 严格分锅 / 温和复盘，权重可自定义
 - **Steam 好友关注**：输入好友代码 / SteamID64 / 个人主页，自动获取最近比赛 ID 并快速分析
+- **静态 HTML 分享**：把比赛分析、分锅、时间轴和图表导出为可离线打开的单文件 HTML
 - **本地永久存档**：分析结果、原始 OpenDota 数据和录像解析字段都保存在本地，后续可直接复查
 - 多模型 GUI：来源预设、Base URL、API Key、模型列表、连接测试、超时与并发设置
 - 已有比赛可用新模型重新生成 AI 建议，不影响已抓取的比赛数据
@@ -259,7 +264,33 @@ VERDICT_MODE=balanced
 - 最多关注 20 人，每人显示最近 8 场，可在 `.env` 调整
 - 关注列表、最近比赛和头像缓存保存在 `cache/follows.json`，已被 Git 忽略
 - 如果对方隐藏了比赛记录，OpenDota 无法获取，会显示刷新失败原因
+- OpenDota 偶尔会整体返回 500；应用会自动重试，失败时保留上次比赛数据，稍后点「刷新全部」即可
 - 刚结束的比赛可能需要几分钟才会出现在 OpenDota 的最近比赛里
+
+## 静态 HTML 分享
+
+比赛详情页右上角有「导出静态 HTML」按钮，会把当前分析保存成一个单文件 HTML：
+
+- CSS、应用脚本和图表脚本全部内联，不依赖本地服务
+- 包含比赛头部、分锅、评分明细、时间轴、10 名玩家面板、AI 建议和经济图表
+- 不需要登录，也不需要输入 API Key
+- 不包含模型 API Key、设置和关注列表
+- 如果当前是基础数据，也会导出，但会明确标记为基础数据
+- 装备图标仍然引用 Steam CDN，完全离线打开时可能无法显示图标，但文字数据不受影响
+
+导出文件默认名为：
+
+```text
+dota_match_<match_id>.html
+```
+
+接口：
+
+```text
+GET /match/{match_id}/export
+```
+
+> 导出的 HTML 会包含玩家昵称和比赛数据，分享前请确认对方是否可以查看这些信息。
 
 ## 支持的模型来源
 
@@ -428,6 +459,7 @@ git ls-files | Select-String -Pattern "llm_settings.json|^cache/|(^|/)\.env$"
 | POST | `/analyze` | 提交比赛分析任务 |
 | GET | `/api/jobs/{match_id}` | 查询比赛分析进度 |
 | GET | `/api/match/{match_id}/data` | 获取结构化分析 JSON（含分锅结果） |
+| GET | `/match/{match_id}/export` | 导出可离线打开的单文件静态 HTML |
 | GET | `/api/match/{match_id}/parse` | 查询后台录像解析状态 |
 | POST | `/api/match/{match_id}/parse` | 重新提交录像解析检查 |
 | POST | `/api/match/{match_id}/reanalyze` | 用当前模型重新生成 AI 建议 |
@@ -475,6 +507,8 @@ git ls-files | Select-String -Pattern "llm_settings.json|^cache/|(^|/)\.env$"
 │   └── utils/                    # 英雄 / 道具中文名、限速
 │
 ├── templates/                    # 页面与模型设置弹窗
+│   ├── share.html                # 单文件静态分享模板
+│   └── partials/match_report.html # 比赛页与分享页共用内容
 ├── static/js/settings.js         # 模型设置 GUI
 ├── static/js/follows.js          # 关注玩家 GUI
 ├── tests/                        # 解析、分锅、关注与配置单元测试

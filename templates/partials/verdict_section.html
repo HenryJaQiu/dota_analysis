@@ -14,10 +14,14 @@
 
     <div class="verdict-toolbar">
         <div class="verdict-modes">
+            {% if share_mode %}
+            <span class="verdict-mode active">{{ analysis.verdict.profile_label or "均衡评估" }}</span>
+            {% else %}
             {% for key, label in modes %}
             <a class="verdict-mode {% if key == current_mode %}active{% endif %}"
                href="/match/{{ analysis.match_id }}?verdict_mode={{ key }}#verdict">{{ label }}</a>
             {% endfor %}
+            {% endif %}
         </div>
         <span class="verdict-profile">
             {{ analysis.verdict.profile_label or analysis.verdict.profile or "均衡评估" }}

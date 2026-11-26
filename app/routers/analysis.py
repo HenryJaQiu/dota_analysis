@@ -1,5 +1,7 @@
 import asyncio
 import logging
+from datetime import datetime
+from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, Form, Request
@@ -85,6 +87,56 @@ async def analyze_match(match_id: str = Form(...)):
         "message": job["message"],
         "redirect_url": job["result_url"],
     }, status_code=202)
+
+
+@router.get("/match/{match_id}/export", response_class=HTMLResponse)
+async def export_match(match_id: int, verdict_mode: str = ""):
+    cache = get_cache()
+    analysis = cache.get(match_id)
+    if not analysis:
+        return HTMLResponse(
+            "<h1>比赛缓存不存在</h1><p>请先在应用中完成该比赛分析。</p>",
+            status_code=404,
+        )
+
+    mode = resolve_profile(verdict_mode)
+    _ensure_verdict(analysis, cache, match_id, mode)
+    ai_model = next(
+        (
+            player.ai_suggestions.model
+            for player in analysis.players
+            if player.ai_suggestions and player.ai_suggestions.model
+        ),
+        None,
+    )
+
+    root = Path(__file__).resolve().parents[2]
+    inline_css = (root / "static" / "css" / "style.css").read_text(encoding="utf-8")
+    inline_app_js = (root / "static" / "js" / "app.js").read_text(encoding="utf-8")
+    inline_charts_js = (root / "static" / "js" / "charts.js").read_text(encoding="utf-8")
+
+    html = templates.get_template("share.html").render({
+        "analysis": analysis,
+        "ai_model": ai_model,
+        "llm": public_settings(),
+        "share_mode": True,
+        "from_cache": True,
+        "parse_refreshing": False,
+        "verdict_mode": mode,
+        "verdict_modes": list(PROFILE_LABELS.items()),
+        "generated_at": datetime.now(),
+        "inline_css": inline_css,
+        "inline_app_js": inline_app_js,
+        "inline_charts_js": inline_charts_js,
+    })
+    filename = f"dota_match_{match_id}.html"
+    return HTMLResponse(
+        content=html,
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "no-store",
+        },
+    )
 
 
 @router.get("/match/{match_id}", response_class=HTMLResponse)

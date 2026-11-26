@@ -1,0 +1,150 @@
+{% if share_mode %}
+<div class="page-actions">
+    <span class="share-badge">静态复盘报告 · 比赛 #{{ analysis.match_id }}</span>
+    <div class="match-actions">
+        <span class="ai-model-badge" title="生成当前 AI 建议所用的模型">
+            AI 建议：<strong>{{ ai_model or "尚未生成" }}</strong>
+        </span>
+    </div>
+</div>
+{% else %}
+<div class="page-actions">
+    <a href="/" class="btn-back-home">返回首页</a>
+    <div class="match-actions">
+        <span class="ai-model-badge" title="生成当前 AI 建议所用的模型">
+            AI 建议：<strong>{{ ai_model or "尚未生成" }}</strong>
+        </span>
+        <a class="btn-secondary" href="/match/{{ analysis.match_id }}/export?verdict_mode={{ verdict_mode }}" download>
+            导出静态 HTML
+        </a>
+        <button type="button" class="btn-secondary" id="reanalyze-btn"
+                data-match-id="{{ analysis.match_id }}">
+            用当前模型重新生成建议
+        </button>
+    </div>
+</div>
+
+<div class="warning-banner js-llm-warning{% if llm and llm.configured %} hidden{% endif %}">
+    <span>尚未配置模型 API Key，当前页面只展示比赛数据。配置后可用当前模型重新生成 AI 建议。</span>
+    <button type="button" class="link-btn" data-open-settings>立即配置</button>
+</div>
+
+<div id="reanalyze-status" class="job-progress hidden"></div>
+{% endif %}
+
+<div class="match-header">
+    <div class="match-info">
+        <h1>比赛 #{{ analysis.match_id }}</h1>
+        <div class="match-meta">
+            <span class="duration">{{ "%.1f"|format(analysis.duration_minutes) }} 分钟</span>
+            <span class="result {% if analysis.radiant_win %}radiant-win{% else %}dire-win{% endif %}">
+                {% if analysis.radiant_win %}天辉胜利{% else %}夜魇胜利{% endif %}
+            </span>
+            <span class="parse-badge {% if analysis.parse_status.value == 'parsed' %}badge-full{% else %}badge-partial{% endif %}">
+                {% if analysis.parse_status.value == 'parsed' %}完整数据{% else %}基础数据{% endif %}
+            </span>
+            {% if from_cache and not share_mode %}<span class="cache-badge">来自缓存</span>{% endif %}
+        </div>
+    </div>
+    {% if analysis.parse_status.value != 'parsed' %}
+    <div class="parse-warning"{% if not share_mode %} id="parse-watch"
+         data-match-id="{{ analysis.match_id }}"
+         data-parse-status="{{ analysis.parse_status.value }}"{% endif %}>
+        <div class="parse-warning-main">
+            <strong>当前为基础数据</strong>：视野、对线、经济曲线等需要录像解析，AI 建议和分锅分析会在解析完成后自动生成。
+            <span id="parse-status-message">
+            {% if share_mode %}
+            这是一份静态报告，不会继续自动刷新。请回到应用重新分析以获取完整数据。
+            {% elif parse_refreshing %}
+            已提交解析请求，正在后台等待 OpenDota 处理，完成后页面会自动刷新。
+            {% else %}
+            解析尚未完成，可点击右侧按钮重新检查。
+            {% endif %}
+            </span>
+        </div>
+        {% if not share_mode %}
+        <div class="parse-warning-actions">
+            <button type="button" class="btn-secondary" id="parse-retry-btn">重新检查解析</button>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
+{% include "partials/verdict_section.html" %}
+{% include "partials/timeline_section.html" %}
+
+<div class="teams-container">
+    <div class="team-tabs">
+        <div class="team-label radiant-label">天辉</div>
+        {% for player in analysis.players %}
+        {% if player.team == "天辉" %}
+        <button class="player-tab {% if loop.index0 == 0 %}active{% endif %}"
+                data-slot="{{ player.player_slot }}"
+                onclick="switchPlayer('{{ player.player_slot }}')">
+            <span class="tab-hero">{{ player.hero_name }}</span>
+            <span class="tab-name">{{ player.personaname or "匿名" }}</span>
+        </button>
+        {% endif %}
+        {% endfor %}
+        <div class="team-label dire-label">夜魇</div>
+        {% for player in analysis.players %}
+        {% if player.team == "夜魇" %}
+        <button class="player-tab"
+                data-slot="{{ player.player_slot }}"
+                onclick="switchPlayer('{{ player.player_slot }}')">
+            <span class="tab-hero">{{ player.hero_name }}</span>
+            <span class="tab-name">{{ player.personaname or "匿名" }}</span>
+        </button>
+        {% endif %}
+        {% endfor %}
+    </div>
+
+    {% for player in analysis.players %}
+    <div class="player-panel {% if loop.index0 == 0 %}active{% endif %}"
+         id="panel-{{ player.player_slot }}">
+        <div class="player-header">
+            <div class="player-title">
+                <h2>{{ player.hero_name }}</h2>
+                <span class="player-name">{{ player.personaname or "匿名" }}</span>
+                <span class="player-rank">{{ player.rank_name }}</span>
+                <span class="player-team-badge {% if player.team == '天辉' %}radiant-badge{% else %}dire-badge{% endif %}">
+                    {{ player.team }}
+                </span>
+            </div>
+        </div>
+
+        <div class="section-tabs">
+            <button class="section-tab active" onclick="switchSection(this, 'economy-{{ player.player_slot }}')">经济</button>
+            <button class="section-tab" onclick="switchSection(this, 'teamfight-{{ player.player_slot }}')">团战</button>
+            <button class="section-tab" onclick="switchSection(this, 'items-{{ player.player_slot }}')">出装</button>
+            <button class="section-tab" onclick="switchSection(this, 'vision-{{ player.player_slot }}')">视野</button>
+            <button class="section-tab" onclick="switchSection(this, 'objectives-{{ player.player_slot }}')">目标</button>
+            <button class="section-tab" onclick="switchSection(this, 'laning-{{ player.player_slot }}')">对线</button>
+        </div>
+
+        <div class="section-content active" id="economy-{{ player.player_slot }}">
+            {% include "partials/economy_section.html" %}
+        </div>
+        <div class="section-content" id="teamfight-{{ player.player_slot }}">
+            {% include "partials/teamfight_section.html" %}
+        </div>
+        <div class="section-content" id="items-{{ player.player_slot }}">
+            {% include "partials/items_section.html" %}
+        </div>
+        <div class="section-content" id="vision-{{ player.player_slot }}">
+            {% include "partials/vision_section.html" %}
+        </div>
+        <div class="section-content" id="objectives-{{ player.player_slot }}">
+            {% include "partials/objectives_section.html" %}
+        </div>
+        <div class="section-content" id="laning-{{ player.player_slot }}">
+            {% include "partials/laning_section.html" %}
+        </div>
+
+        {% if player.ai_suggestions %}
+        {% include "partials/suggestions_box.html" %}
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>

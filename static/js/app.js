@@ -1,3 +1,27 @@
+function safeStorageGet(key) {
+    try {
+        return window.localStorage.getItem(key);
+    } catch (error) {
+        return null;
+    }
+}
+
+function safeStorageSet(key, value) {
+    try {
+        window.localStorage.setItem(key, value);
+    } catch (error) {
+        // Static exported HTML may not allow localStorage.
+    }
+}
+
+function safeStorageRemove(key) {
+    try {
+        window.localStorage.removeItem(key);
+    } catch (error) {
+        // Static exported HTML may not allow localStorage.
+    }
+}
+
 function switchPlayer(slot) {
     document.querySelectorAll(".player-tab").forEach(t => t.classList.remove("active"));
     document.querySelectorAll(".player-panel").forEach(p => p.classList.remove("active"));
@@ -72,7 +96,7 @@ async function pollJob(matchId) {
         renderJobProgress(job);
 
         if (job.status === "completed") {
-            localStorage.removeItem("activeMatchJob");
+            safeStorageRemove("activeMatchJob");
             if (pollTimer) clearInterval(pollTimer);
             pollTimer = null;
             if (job.redirect_url) {
@@ -82,7 +106,7 @@ async function pollJob(matchId) {
         }
 
         if (job.status === "failed") {
-            localStorage.removeItem("activeMatchJob");
+            safeStorageRemove("activeMatchJob");
             if (pollTimer) clearInterval(pollTimer);
             pollTimer = null;
         }
@@ -122,7 +146,7 @@ if (analyzeForm) {
                 throw new Error(payload.error || "提交分析任务失败");
             }
 
-            localStorage.setItem("activeMatchJob", String(payload.match_id));
+            safeStorageSet("activeMatchJob", String(payload.match_id));
             renderJobProgress(payload);
             startPolling(payload.match_id);
         } catch (error) {
@@ -352,7 +376,7 @@ function initParseWatcher() {
 
 document.addEventListener("DOMContentLoaded", function () {
     const queryMatchId = new URLSearchParams(window.location.search).get("match_id");
-    const activeJob = localStorage.getItem("activeMatchJob");
+    const activeJob = safeStorageGet("activeMatchJob");
     const matchId = queryMatchId || activeJob;
     if (matchId && document.getElementById("job-progress")) {
         startPolling(matchId);
