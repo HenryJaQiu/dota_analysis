@@ -35,3 +35,13 @@ def test_static_export_is_self_contained(tmp_path, monkeypatch):
     assert "settings-modal" not in text
     assert "/static/css/style.css" not in text
     assert "settings.js" not in text
+
+    # Static reports must expose every player without relying on tab JavaScript.
+    assert text.count('class="player-panel') == 10
+    assert text.count('class="share-player-link"') == 10
+    assert text.count('class="share-section-title"') == 60
+    assert text.count('href="#panel-') == 20
+    assert text.count('href="#players"') == 10
+    assert 'id="players"' in text
+    assert 'onclick="switchPlayer' not in text
+    assert ".share-page .player-panel" in text

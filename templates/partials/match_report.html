@@ -75,10 +75,32 @@
 {% include "partials/timeline_section.html" %}
 
 <div class="teams-container">
+    {% if share_mode %}
+    <div class="share-player-nav" id="players">
+        <div class="share-nav-title">跳到玩家</div>
+        <div class="share-nav-links">
+            {% for player in analysis.players %}
+            <a class="share-player-link" href="#panel-{{ player.player_slot }}">
+                <span class="share-player-team {% if player.team == '天辉' %}radiant-badge{% else %}dire-badge{% endif %}">{{ player.team }}</span>
+                <strong>{{ player.hero_name }}</strong>
+                <span class="share-player-name">{{ player.personaname or "匿名" }}</span>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
     <div class="team-tabs">
         <div class="team-label radiant-label">天辉</div>
         {% for player in analysis.players %}
         {% if player.team == "天辉" %}
+        {% if share_mode %}
+        <a class="player-tab" href="#panel-{{ player.player_slot }}"
+           data-slot="{{ player.player_slot }}">
+            <span class="tab-hero">{{ player.hero_name }}</span>
+            <span class="tab-name">{{ player.personaname or "匿名" }}</span>
+        </a>
+        {% else %}
         <button class="player-tab {% if loop.index0 == 0 %}active{% endif %}"
                 data-slot="{{ player.player_slot }}"
                 onclick="switchPlayer('{{ player.player_slot }}')">
@@ -86,16 +108,25 @@
             <span class="tab-name">{{ player.personaname or "匿名" }}</span>
         </button>
         {% endif %}
+        {% endif %}
         {% endfor %}
         <div class="team-label dire-label">夜魇</div>
         {% for player in analysis.players %}
         {% if player.team == "夜魇" %}
+        {% if share_mode %}
+        <a class="player-tab" href="#panel-{{ player.player_slot }}"
+           data-slot="{{ player.player_slot }}">
+            <span class="tab-hero">{{ player.hero_name }}</span>
+            <span class="tab-name">{{ player.personaname or "匿名" }}</span>
+        </a>
+        {% else %}
         <button class="player-tab"
                 data-slot="{{ player.player_slot }}"
                 onclick="switchPlayer('{{ player.player_slot }}')">
             <span class="tab-hero">{{ player.hero_name }}</span>
             <span class="tab-name">{{ player.personaname or "匿名" }}</span>
         </button>
+        {% endif %}
         {% endif %}
         {% endfor %}
     </div>
@@ -112,8 +143,37 @@
                     {{ player.team }}
                 </span>
             </div>
+            {% if share_mode %}
+            <a class="share-back-link" href="#players">↑ 玩家列表</a>
+            {% endif %}
         </div>
 
+        {% if share_mode %}
+        <div class="share-section">
+            <h3 class="share-section-title">经济</h3>
+            {% include "partials/economy_section.html" %}
+        </div>
+        <div class="share-section">
+            <h3 class="share-section-title">团战</h3>
+            {% include "partials/teamfight_section.html" %}
+        </div>
+        <div class="share-section">
+            <h3 class="share-section-title">出装</h3>
+            {% include "partials/items_section.html" %}
+        </div>
+        <div class="share-section">
+            <h3 class="share-section-title">视野</h3>
+            {% include "partials/vision_section.html" %}
+        </div>
+        <div class="share-section">
+            <h3 class="share-section-title">目标</h3>
+            {% include "partials/objectives_section.html" %}
+        </div>
+        <div class="share-section">
+            <h3 class="share-section-title">对线</h3>
+            {% include "partials/laning_section.html" %}
+        </div>
+        {% else %}
         <div class="section-tabs">
             <button class="section-tab active" onclick="switchSection(this, 'economy-{{ player.player_slot }}')">经济</button>
             <button class="section-tab" onclick="switchSection(this, 'teamfight-{{ player.player_slot }}')">团战</button>
@@ -141,6 +201,7 @@
         <div class="section-content" id="laning-{{ player.player_slot }}">
             {% include "partials/laning_section.html" %}
         </div>
+        {% endif %}
 
         {% if player.ai_suggestions %}
         {% include "partials/suggestions_box.html" %}

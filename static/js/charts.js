@@ -340,6 +340,14 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     });
 
+    if (document.body.classList.contains("share-page")) {
+        document.querySelectorAll(".player-panel").forEach(panel => {
+            const slot = panel.id.replace("panel-", "");
+            renderChartsForPlayer(slot);
+        });
+        return;
+    }
+
     const activeTab = document.querySelector(".player-tab.active");
     if (activeTab) {
         const slot = activeTab.getAttribute("data-slot");
